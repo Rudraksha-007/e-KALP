@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import bgImage from "../../src/assets/bg.png";
 import CTA_IMG from "../../src/assets/cta1.png";
 import logo from "../assets/logo.png";
@@ -15,6 +16,8 @@ function NavLink({ children }) {
 }
 
 function Navbar() {
+  const navigate = useNavigate();
+
   return (
     <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-10 py-6">
       <div className="flex items-center gap-3">
@@ -39,10 +42,16 @@ function Navbar() {
       </nav> */}
 
       <div className="flex items-center gap-6">
-        <span className="text-[11px] tracking-[0.15em] text-white/80 font-mono hidden sm:inline">
+        <button
+          onClick={() => navigate("/select-role")}
+          className="text-[11px] tracking-[0.15em] text-white/80 font-mono hidden sm:inline hover:text-white transition-colors"
+        >
           LOGIN
-        </span>
-        <button className="bg-orange-500 hover:bg-orange-600 transition-colors text-white text-[11px] tracking-[0.15em] font-mono px-4 py-2.5 flex items-center gap-2">
+        </button>
+        <button
+          onClick={() => navigate("/select-role")}
+          className="bg-orange-500 hover:bg-orange-600 transition-colors text-white text-[11px] tracking-[0.15em] font-mono px-4 py-2.5 flex items-center gap-2"
+        >
           GET STARTED <span>→</span>
         </button>
       </div>
@@ -51,6 +60,8 @@ function Navbar() {
 }
 
 function Hero() {
+  const navigate = useNavigate();
+
   return (
     <section className="relative bg-black overflow-hidden">
       <div className="absolute inset-0">
@@ -88,7 +99,10 @@ function Hero() {
         </p>
 
         <div className="mt-9 flex items-center gap-8 flex-wrap">
-          <button className="bg-orange-500 hover:bg-orange-600 transition-colors text-white text-[11px] tracking-[0.15em] font-mono px-6 py-4 flex items-center gap-2">
+          <button
+            onClick={() => navigate("/select-role")}
+            className="bg-orange-500 hover:bg-orange-600 transition-colors text-white text-[11px] tracking-[0.15em] font-mono px-6 py-4 flex items-center gap-2"
+          >
             REPORT A PROBLEM <span>→</span>
           </button>
           <button className="text-white text-[11px] tracking-[0.15em] font-mono flex items-center gap-2 border-b border-white/40 pb-1 hover:border-white transition-colors">
@@ -298,6 +312,8 @@ function Methodology() {
 }
 
 function CallToAction() {
+  const navigate = useNavigate();
+
   return (
     <section className="relative bg-neutral-300 overflow-hidden">
       <div className="absolute inset-0">
@@ -326,7 +342,10 @@ function CallToAction() {
             See a problem. Report it. Be part of the solution.
           </p>
 
-          <button className="mt-10 bg-orange-500 hover:bg-orange-600 transition-colors text-white text-[11px] tracking-[0.15em] font-mono px-7 py-4 inline-flex items-center gap-2">
+          <button
+            onClick={() => navigate("/select-role")}
+            className="mt-10 bg-orange-500 hover:bg-orange-600 transition-colors text-white text-[11px] tracking-[0.15em] font-mono px-7 py-4 inline-flex items-center gap-2"
+          >
             GET STARTED <span>→</span>
           </button>
         </div>
@@ -341,6 +360,8 @@ function CallToAction() {
 }
 
 function Footer() {
+  const navigate = useNavigate();
+
   return (
     <footer className="bg-black px-10 py-6 flex items-center justify-between flex-wrap gap-4">
       <div className="flex items-center gap-6">
@@ -353,7 +374,9 @@ function Footer() {
         <span>ABOUT</span>
         <span>HOW IT WORKS</span>
         <span>IMPACT</span>
-        <span>LOGIN</span>
+        <button onClick={() => navigate("/select-role")} className="hover:text-white transition-colors">
+          LOGIN
+        </button>
         <span>© 2025 PORTAL INITIATIVE</span>
       </div>
     </footer>
