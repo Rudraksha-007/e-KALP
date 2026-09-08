@@ -1,0 +1,13 @@
+.vscodevenv/
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+data/
+*.pkl
+*.joblib
+*.pt
+*.pth
+.vscode/
+.idea/
