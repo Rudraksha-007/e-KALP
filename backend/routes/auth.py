@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.auth import User, UserRole
 from schemas.auth import UserRegister, UserLogin, UserOut, TokenPair, RefreshRequest
+from backend.models.auth import UserRole
 from services.auth import (
     hash_password,
     authenticate_user,
@@ -19,23 +20,10 @@ from services.auth import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == payload.email))
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+@router.post("{role}/signup", status_code=status.HTTP_201_CREATED)
+async def signup(role: str, payload: UserRegister, db: AsyncSession = Depends(get_db)):
 
-    user = User(
-        name=payload.name,
-        email=payload.email,
-        phone=payload.phone,
-        password_hash=hash_password(payload.password),
-        role=payload.role,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user
+    pass
 
 
 @router.post("/{role}/login", response_model=TokenPair)
@@ -58,9 +46,9 @@ async def logout(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
     await revoke_refresh_token(db, payload.refresh_token)
 
 
-@router.get("/me", response_model=UserOut)
-async def me(user: User = Depends(get_current_user)):
-    return user
+# @router.get("/me", response_model=UserOut)
+# async def me(user: User = Depends(get_current_user)):
+#     return user
 
 
 # Example RBAC-protected route — swap roles as needed per endpoint
