@@ -118,9 +118,7 @@ export default function App() {
           <Route
             path="/industry/dashboard"
             element={
-              // <ProtectedRoute allowedRoles={[ROLES.INDUSTRY_SPOC]}>
-                <IndustryDashboard />
-              // </ProtectedRoute>
+                <IndustryDashboard />             
             }
           />
           <Route
