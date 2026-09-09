@@ -5,7 +5,6 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from pwdlib import PasswordHash
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,8 +15,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 bearer_scheme = HTTPBearer(auto_error=False)
 password_hash = PasswordHash.recommended()
-# tokenUrl is just for the OpenAPI docs "Authorize" button; role-based login below is the real entrypoint
-
 
 
 def hash_password(password: str) -> str:
