@@ -16,8 +16,18 @@ import IndustryLogin from "./auth/IndustryLogin";
 import IndustryRegister from "./auth/IndustryRegister";
 import AdminLogin from "./auth/AdminLogin";
 
+
+// citizen pages
 import CitizenDashboard from "./pages/citizens/CitizenDashboard";
+
+//industry pages
 import UniversityDashboard from "./pages/university/UniversityDashboard";
+import Approvals from "./pages/university/Approvals";
+import Industry from "./pages/university/Industry";
+import Projects from "./pages/university/Projects";
+import ProjectDetail from "./pages/university/ProjectDetail";
+
+
 import IndustryDashboard from "./pages/industry/IndustryDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 
@@ -51,25 +61,60 @@ export default function App() {
           <Route
             path="/citizen/dashboard"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.CITIZEN]}>
+              // <ProtectedRoute allowedRoles={[ROLES.CITIZEN]}>
                 <CitizenDashboard />
-              </ProtectedRoute>
+              // </ProtectedRoute>
             }
           />
+          
           <Route
             path="/university/dashboard"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.UNI_SPOC]}>
+              // <ProtectedRoute allowedRoles={[ROLES.UNI_SPOC]}>
                 <UniversityDashboard />
-              </ProtectedRoute>
+              // </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/university/approvals"
+            element={
+              // <ProtectedRoute allowedRoles={[ROLES.UNI_SPOC]}>
+                <Approvals />
+              // </ProtectedRoute>
             }
           />
           <Route
+            path="/university/industry"
+            element={
+              // <ProtectedRoute allowedRoles={[ROLES.UNI_SPOC]}>
+                <Industry />
+              // </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/university/projects"
+            element={
+              // <ProtectedRoute allowedRoles={[ROLES.UNI_SPOC]}>
+                <Projects />
+              // </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/university/projects/:id"
+            element={
+              // <ProtectedRoute allowedRoles={[ROLES.UNI_SPOC]}>
+                <ProjectDetail />
+              // </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/industry/dashboard"
             element={
-              <ProtectedRoute allowedRoles={[ROLES.INDUSTRY_SPOC]}>
+              // <ProtectedRoute allowedRoles={[ROLES.INDUSTRY_SPOC]}>
                 <IndustryDashboard />
-              </ProtectedRoute>
+              // </ProtectedRoute>
             }
           />
           <Route
