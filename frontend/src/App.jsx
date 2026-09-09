@@ -31,6 +31,8 @@ import ProjectDetail from "./pages/university/ProjectDetail";
 import IndustryDashboard from "./pages/industry/IndustryDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 
+import CitizenLayout from "./pages/citizens/CitizenLayout";
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -41,7 +43,12 @@ export default function App() {
           <Route path="/select-role" element={<RoleSelection />} />
           <Route path="/signup" element={<SignUppage />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
-
+          <Route path="/citizen/dashboard" element={<CitizenDashboard />} />
+          <Route path="/citizen" element={<CitizenLayout />}>
+            <Route path="dashboard" element={<CitizenDashboard />} />
+            {/* <Route path="profile" element={<CitizenProfile />} />
+            <Route path="footer" element={<CitizenFooter />} /> */}
+          </Route>
           {/* Auth: Citizen */}
           <Route path="/auth/citizen/login" element={<CitizenLogin />} />
           <Route path="/auth/citizen/register" element={<CitizenRegister />} />
@@ -58,15 +65,14 @@ export default function App() {
           <Route path="/auth/admin/login" element={<AdminLogin />} />
 
           {/* Protected dashboards — one allowed role each */}
-          <Route
+          {/* <Route
             path="/citizen/dashboard"
             element={
               // <ProtectedRoute allowedRoles={[ROLES.CITIZEN]}>
                 <CitizenDashboard />
               // </ProtectedRoute>
             }
-          />
-          
+          /> */}
           <Route
             path="/university/dashboard"
             element={
