@@ -1,184 +1,187 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional
-from uuid import UUID
+from __future__ import annotations
+
+import re
 from datetime import datetime
-from enum import Enum
+from decimal import Decimal
+from typing import Annotated, Any, Generic, Literal, TypeVar, Union
+from uuid import UUID
 
-# ==================== ENUMS ====================
-class StatusEnum(str, Enum):
-    NO_BIDDERS = "NO_BIDDERS"
-    RESOLVED = "RESOLVED"
-    AWAITING_FUNDING = "AWAITING_FUNDING"
-    AWAITING_FEEDBACK = "AWAITING_FEEDBACK"
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+)
 
-
-class CategoryEnum(str, Enum):
-    EDUCATION = "education"
-    HEALTHCARE = "healthcare"
-    AGRICULTURE = "agriculture"
-    WATER_MANAGEMENT = "water management"
-    SANITATION = "sanitation"
-    ENVIRONMENT = "environment"
-    RURAL_LIVELIHOODS = "rural livelihoods"
-    ACCESSIBILITY = "accessibility"
-    URBAN_INFRASTRUCTURE = "urban infrastructure"
-    PUBLIC_SERVICE_DELIVERY = "public service delivery"
+# ------------------------------------------------------------------------------
+# Constants
+# ------------------------------------------------------------------------------
+PHONE_PATTERN = r"^[0-9]{10}$"
+PASSWORD_MIN = 8
+PASSWORD_MAX = 128
 
 
-# ==================== NESTED MODELS ====================
-class ProposalItem(BaseModel):
-    """
-    Matches the dict keys enforced by ProblemStatement.validate_proposals
-    in models.py: "SPOC_UUID" and "TOKEN_NUMBER_Team_lead".
-    """
-    spoc_uuid: UUID = Field(..., alias="SPOC_UUID")
-    team_lead_token: int = Field(..., alias="TOKEN_NUMBER_Team_lead")
+# ------------------------------------------------------------------------------
+# Base configs
+# ------------------------------------------------------------------------------
+class ORMBase(BaseModel):
+    """Base for response schemas read from SQLAlchemy ORM objects."""
 
-    model_config = {"populate_by_name": True}
-
-
-# ==================== PROBLEM STATEMENT ====================
-class ProblemStatementBase(BaseModel):
-    title: str
-    description: str = Field(..., alias="PD")  # maps to `pd` column
-    photos: Optional[str] = None  # NOTE: model column is LargeBinary — assumes URL/path here, not raw bytes
-    videos: Optional[str] = None  # same assumption
-    location: str
-    status: StatusEnum = StatusEnum.NO_BIDDERS
-    assigned_to: Optional[UUID] = None
-    proposals: List[ProposalItem] = []
-    categories: List[CategoryEnum] = []  # was `category: Optional[...]`, renamed + defaulted to match model
-
-    model_config = {"populate_by_name": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        str_strip_whitespace=True,
+    )
 
 
-class ProblemStatementCreate(ProblemStatementBase):
-    user_id: UUID = Field(..., alias="USER_ID")
-    # token_number, id, date_reported are auto-generated server-side
+class InputBase(BaseModel):
+    """Base for inbound request bodies."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+    )
 
 
-class ProblemStatementResponse(ProblemStatementBase):
-    id: UUID = Field(..., alias="ID")
-    user_id: UUID = Field(..., alias="USER_ID")
-    token_number: int = Field(..., alias="Token_number")
-    date_reported: datetime = Field(..., alias="DATE_REPORTED")  # was `date`, model column is DateTime
+# ------------------------------------------------------------------------------
+# Common auth schemas
+# ------------------------------------------------------------------------------
+class TokenPair(BaseModel):
+    access_token: str
+    refresh_token: str | None = None
+    token_type: Literal["bearer"] = "bearer"
 
-    model_config = {"populate_by_name": True}
+
+T = TypeVar("T")
 
 
-# ==================== CITIZEN ====================
-class CitizenBase(BaseModel):
+class AuthResponse(BaseModel, Generic[T]):
+    user: T
+    tokens: TokenPair
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+class ErrorResponse(BaseModel):
+    detail: str
+
+
+# ------------------------------------------------------------------------------
+# SPOC University
+# ------------------------------------------------------------------------------
+class SpocSignup(InputBase):
+    uni_name: str = Field(..., min_length=1, max_length=255)
+    name: str = Field(..., min_length=1, max_length=255)
+    subject_expertise: list[str] = Field(default_factory=list)
+    problems_proposal: list[dict[str, Any]] = Field(default_factory=list)
+    phone_number: str = Field(..., pattern=PHONE_PATTERN)
+    password: str = Field(..., min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
+
+
+class SpocLogin(InputBase):
+    phone_number: str = Field(..., pattern=PHONE_PATTERN)
+    password: str = Field(..., min_length=1, max_length=PASSWORD_MAX)
+
+
+class SpocResponse(ORMBase):
+    role: Literal["spocuni"] = "spocuni"
+    id: UUID
+    serial_id: int
+    uni_name: str
     name: str
-    phone_number: str = Field(..., pattern=r"^\d{10}$")
-    pass_hash: Optional[str] = None
-    location: str
-    occupation: str
-    age: int = Field(..., ge=0, le=150)
-    gender: str = Field(..., pattern=r"^[MF]$")
+    subject_expertise: list[str]
+    problems_proposal: list[dict[str, Any]]
+    phone_number: str
+
+
+# ------------------------------------------------------------------------------
+# Citizen
+# ------------------------------------------------------------------------------
+class CitizenSignup(InputBase):
+    name: str = Field(..., min_length=1, max_length=255)
+    phone_number: str = Field(..., pattern=PHONE_PATTERN)
+    password: str = Field(..., min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
+    location: str = Field(..., min_length=1)
+    occupation: str = Field(..., min_length=1)
+    age: int = Field(..., gt=0, lt=130)
+    gender: Literal["M", "F"]
+    university_token: int | None = None
 
     @field_validator("occupation")
     @classmethod
-    def normalize_occupation(cls, v: str) -> str:
-        return v.lower().replace(" ", "")
+    def validate_occupation(cls, v: str) -> str:
+        if v != v.lower() or re.search(r"\s", v):
+            raise ValueError("occupation must be lowercase and contain no whitespace")
+        return v
 
 
-class CitizenCreate(CitizenBase):
-    pass
+class CitizenLogin(InputBase):
+    phone_number: str = Field(..., pattern=PHONE_PATTERN)
+    password: str = Field(..., min_length=1, max_length=PASSWORD_MAX)
 
 
-class CitizenResponse(CitizenBase):
-    id: UUID = Field(..., alias="ID")
-    serial_id: int  # was missing — model exposes this as the human-readable ID
-    my_reports: List[UUID] = Field(default_factory=list, alias="myReports")
+class CitizenResponse(ORMBase):
+    role: Literal["citizen"] = "citizen"
+    id: UUID
+    serial_id: int
+    name: str
+    phone_number: str
+    location: str
+    occupation: str
+    age: int
+    gender: Literal["M", "F"]
+    university_token: int | None = None
+    created_at: datetime
 
-    model_config = {"populate_by_name": True}
+
+# ------------------------------------------------------------------------------
+# TeamLead
+# ------------------------------------------------------------------------------
+class WorkspaceCreate(InputBase):
+    milestones: list[str] = Field(default_factory=list)
+    cost_estimate: Decimal
+    industry_partner: UUID | None = None
 
 
-# ==================== TEAM LEAD ====================
-class TeamLeadBase(BaseModel):
+class TeamLeadSignup(InputBase):
+    name: str = Field(..., min_length=1, max_length=255)
+    email: EmailStr
+    password: str = Field(..., min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
+    uni_id: UUID
+    team_members: list[str] = Field(default_factory=list)
+    workspace: WorkspaceCreate
+
+
+class TeamLeadLogin(InputBase):
+    email: EmailStr
+    password: str = Field(..., min_length=1, max_length=PASSWORD_MAX)
+
+
+class TeamLeadResponse(ORMBase):
+    role: Literal["teamlead"] = "teamlead"
+    id: UUID
+    serial_id: int
+    name: str
+    email: EmailStr
+    token: int
     workspace_id: UUID
     uni_id: UUID
-    team_members: List[str] = []  # was missing entirely
+    problem_assigned: UUID | None = None
+    team_members: list[str]
 
 
-class TeamLeadCreate(TeamLeadBase):
-    pass  # token is randomly generated server-side; id is auto UUID
+# ------------------------------------------------------------------------------
+# Signup envelope — discriminated union so Pydantic never guesses the branch
+# ------------------------------------------------------------------------------
+SignupData = Annotated[
+    Union[CitizenResponse, SpocResponse, TeamLeadResponse],
+    Field(discriminator="role"),
+]
 
 
-class TeamLeadResponse(TeamLeadBase):
-    id: UUID
-    serial_id: int  # was missing
-    token: int
-
-
-# ==================== SPOC UNIVERSITY ====================
-class SPOCUniversityBase(BaseModel):
-    uni_name: str
-    subject_expertise: List[CategoryEnum]
-    phone_number: str = Field(..., pattern=r"^\d{10}$")
-    pass_hash: str
-
-
-class SPOCUniversityCreate(SPOCUniversityBase):
-    problems_proposal: List[ProposalItem] = []
-
-
-class SPOCUniversityResponse(SPOCUniversityBase):
-    id: UUID
-    serial_id: int  # was missing
-    problems_proposal: List[ProposalItem]
-
-
-# ==================== WORKSPACE ====================
-class WorkspaceBase(BaseModel):
-    milestones: List[str]
-    cost_estimate: float = Field(..., ge=0)
-    industry_partner: Optional[UUID] = None
-
-
-class WorkspaceCreate(WorkspaceBase):
-    pass
-
-
-class WorkspaceResponse(WorkspaceBase):
-    id: UUID
-    serial_id: int  # was missing
-
-
-# ==================== ADMIN / GOV (no matching model in models.py) ====================
-class AdminGovBase(BaseModel):
-    user_id: UUID
-    specialization: str
-    designation: str
-    dep_name: str
-    location_city: str = Field(..., alias="location/city")
-
-    model_config = {"populate_by_name": True}
-
-
-class AdminGovCreate(AdminGovBase):
-    pass
-
-
-class AdminGovResponse(AdminGovBase):
-    id: UUID
-
-
-# ==================== SPOC INDUSTRY (no matching model in models.py) ====================
-class SPOCIndustryBase(BaseModel):
-    user_id: UUID
-    industry_name: str
-    address: str
-    city_location: str = Field(..., alias="city/location")
-    industry_type: str
-    collab_type: Optional[str] = None
-
-    model_config = {"populate_by_name": True}
-
-
-class SPOCIndustryCreate(SPOCIndustryBase):
-    pass
-
-
-class SPOCIndustryResponse(SPOCIndustryBase):
-    id: UUID
+class SignupResponse(BaseModel):
+    status: Literal["success"] = "success"
+    message: str
+    data: SignupData
