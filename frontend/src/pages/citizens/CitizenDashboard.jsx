@@ -303,7 +303,7 @@ const ReportProblem = ({ go }) => (
           <button onClick={() => go("dashboard")} className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
             <ArrowLeft size={16} /> Cancel Submission
           </button>
-          <h1 className="text-lg font-bold text-emerald-800">Jharkhand Innovation Portal</h1>
+          {/* <h1 className="text-lg font-bold text-emerald-800">Jharkhand Innovation Portal</h1> */}
           <div className="w-32" />
         </div>
       </div>
