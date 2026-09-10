@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any, Generic, Literal, TypeVar, Union
 from uuid import UUID
+from models.model import ProblemStatement, ProblemStatus
 
 from pydantic import (
     BaseModel,
@@ -185,3 +186,32 @@ class SignupResponse(BaseModel):
     status: Literal["success"] = "success"
     message: str
     data: SignupData
+
+
+ProblemStatusLiteral = Literal[
+    "NO_BIDDERS", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "CLOSED"
+]
+
+
+class ProblemStatementResponse(ORMBase):
+    id: UUID
+    token_number: int
+    user_id: UUID
+    title: str
+    pd: str
+    photos: list[str] = []
+    videos: list[str] = []
+    location: str
+    status: ProblemStatus
+    assigned_to: UUID | None = None
+    proposals: list[dict[str, Any]] = []
+    date_reported: datetime
+    categories: list[str] = []
+    created_at: datetime
+
+
+class ProblemListResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: list[ProblemStatementResponse]
