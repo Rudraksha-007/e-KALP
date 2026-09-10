@@ -173,9 +173,9 @@ const PROGRESS_BAR_COLOR = {
 };
 
 const BADGE_TONE_CLASSES = {
-  default: "bg-orange-100 text-orange-600",
-  danger: "bg-red-100 text-red-600",
-  info: "bg-blue-100 text-blue-600",
+  default: "bg-orange-50 text-orange-600",
+  danger: "bg-red-50 text-red-600",
+  info: "bg-sky-50 text-sky-700",
 };
 
 /** ------------------------------------------------------------------
@@ -184,14 +184,14 @@ const BADGE_TONE_CLASSES = {
 
 function GreetingBanner({ user, attentionCount, onIndustryClick, onApprovalsClick, industryCount, approvalsCount }) {
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white px-6 py-5 flex items-center justify-between">
+    <div className="border border-neutral-200 bg-white px-6 py-5 flex items-center justify-between">
       <div>
-        <h2 className="text-lg font-semibold text-neutral-900">
+        <h2 className="text-lg font-black text-neutral-950 tracking-tight">
           {user.greeting}, {user.name}
         </h2>
-        <p className="text-sm text-neutral-500 mt-1">
+        <p className="text-sm text-neutral-500 mt-1 font-mono">
           {user.institute} · {user.semester} ·{" "}
-          <span className="text-orange-600 font-medium">
+          <span className="text-orange-600 font-semibold">
             {attentionCount} items need your attention
           </span>
         </p>
@@ -199,13 +199,13 @@ function GreetingBanner({ user, attentionCount, onIndustryClick, onApprovalsClic
       <div className="flex items-center gap-3 shrink-0">
         <button
           onClick={onIndustryClick}
-          className="px-4 py-2 rounded-lg bg-orange-50 text-orange-600 text-sm font-medium hover:bg-orange-100 transition-colors"
+          className="px-4 py-2 bg-orange-50 text-orange-600 text-sm font-semibold hover:bg-orange-100 transition-colors"
         >
           Industry ({industryCount})
         </button>
         <button
           onClick={onApprovalsClick}
-          className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 transition-colors"
+          className="px-4 py-2 bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 transition-colors"
         >
           Team Approvals ({approvalsCount})
         </button>
@@ -216,20 +216,20 @@ function GreetingBanner({ user, attentionCount, onIndustryClick, onApprovalsClic
 
 function StatCard({ label, value, badge, badgeTone = "default", caption }) {
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white px-5 py-4">
+    <div className="border border-neutral-200 bg-white px-5 py-4">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-medium text-neutral-400 tracking-wide">
+        <span className="text-[10px] font-mono font-bold text-neutral-400 tracking-[0.1em]">
           {label.toUpperCase()}
         </span>
         {badge != null && (
           <span
-            className={`text-xs font-semibold rounded-full min-w-[22px] h-[22px] px-1.5 flex items-center justify-center ${BADGE_TONE_CLASSES[badgeTone]}`}
+            className={`text-[10px] font-mono font-bold min-w-[22px] h-[22px] px-1.5 flex items-center justify-center ${BADGE_TONE_CLASSES[badgeTone]}`}
           >
             {badge}
           </span>
         )}
       </div>
-      <p className="text-3xl font-semibold text-neutral-900">{value}</p>
+      <p className="text-3xl font-black text-neutral-950">{value}</p>
       <p className="text-xs text-neutral-500 mt-1">{caption}</p>
     </div>
   );
@@ -246,21 +246,21 @@ function ProblemStatementRow({ item }) {
         />
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-medium text-neutral-500 bg-neutral-100 rounded px-1.5 py-0.5">
+            <span className="text-[10px] font-mono font-bold text-neutral-500 bg-neutral-100 px-1.5 py-0.5">
               {item.code}
             </span>
-            <span className="text-xs text-neutral-400">{item.domain}</span>
+            <span className="text-xs text-neutral-400 font-mono">{item.domain}</span>
           </div>
-          <p className="text-sm font-medium text-neutral-900">{item.title}</p>
-          <p className="text-xs text-neutral-500 mt-1 truncate">
+          <p className="text-sm font-semibold text-neutral-900">{item.title}</p>
+          <p className="text-xs text-neutral-500 mt-1 truncate font-mono">
             {item.sponsor} · {item.teamsApplying} team{item.teamsApplying !== 1 ? "s" : ""} applying · Deadline{" "}
             {item.deadline}
           </p>
         </div>
       </div>
       <div className="text-right shrink-0 pl-4">
-        <p className="text-lg font-semibold text-orange-500">{item.matchPercent}%</p>
-        <p className="text-xs text-neutral-400 border-t border-orange-300 pt-0.5 mt-0.5">match</p>
+        <p className="text-lg font-black text-orange-500">{item.matchPercent}%</p>
+        <p className="text-[9px] font-mono text-neutral-400 border-t border-orange-300 pt-0.5 mt-0.5 tracking-wide">MATCH</p>
       </div>
     </div>
   );
@@ -268,16 +268,16 @@ function ProblemStatementRow({ item }) {
 
 function RecommendedProblemStatements({ items }) {
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white px-6 py-5">
+    <div className="border border-neutral-200 bg-white px-6 py-5">
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-base font-semibold text-neutral-900">
+        <h3 className="text-base font-bold text-neutral-950">
           Recommended Problem Statements
         </h3>
-        <span className="text-xs font-medium bg-orange-50 text-orange-600 rounded-full px-2.5 py-1">
-          {items.length} matched
+        <span className="text-[10px] font-mono font-bold bg-orange-50 text-orange-600 px-2.5 py-1">
+          {items.length} MATCHED
         </span>
       </div>
-      <p className="text-xs text-neutral-500 mb-2">
+      <p className="text-xs text-neutral-500 mb-2 font-mono">
         Matched to institute strengths in CSE, ECE, Civil, IT
       </p>
       <div>
@@ -295,25 +295,25 @@ function ActiveProjectRow({ project, onClick }) {
     <div onClick={() => onClick(project)} className="py-4 border-b border-neutral-100 last:border-none group cursor-pointer">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 min-w-0">
-          <p className="text-sm font-medium text-neutral-900 truncate">{project.title}</p>
-          <span className={`flex items-center gap-1 text-xs font-medium ${statusStyle.text}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
+          <p className="text-sm font-semibold text-neutral-900 truncate">{project.title}</p>
+          <span className={`flex items-center gap-1 text-xs font-semibold ${statusStyle.text}`}>
+            <span className={`w-1.5 h-1.5 ${statusStyle.dot}`} />
             {project.status}
           </span>
         </div>
         <ChevronRight className="w-4 h-4 text-neutral-300 group-hover:text-neutral-500 shrink-0" />
       </div>
-      <p className="text-xs text-neutral-500 mb-2">
+      <p className="text-xs text-neutral-500 mb-2 font-mono">
         {project.team} · {project.department} · {project.mentor}
       </p>
       <div className="flex items-center gap-3">
-        <div className="flex-1 h-1.5 rounded-full bg-neutral-100 overflow-hidden">
+        <div className="flex-1 h-1 bg-neutral-100 overflow-hidden">
           <div
-            className={`h-full rounded-full ${PROGRESS_BAR_COLOR[project.status]}`}
+            className={`h-full ${PROGRESS_BAR_COLOR[project.status]}`}
             style={{ width: `${project.progress}%` }}
           />
         </div>
-        <span className="text-xs text-neutral-500 w-9 text-right">{project.progress}%</span>
+        <span className="text-xs text-neutral-500 w-9 text-right font-mono">{project.progress}%</span>
       </div>
     </div>
   );
@@ -321,10 +321,10 @@ function ActiveProjectRow({ project, onClick }) {
 
 function ActiveProjects({ projects, onViewAll, onSelect }) {
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white px-6 py-5">
+    <div className="border border-neutral-200 bg-white px-6 py-5">
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-base font-semibold text-neutral-900">Active Projects</h3>
-        <button onClick={onViewAll} className="text-xs font-medium text-orange-600 hover:text-orange-700">
+        <h3 className="text-base font-bold text-neutral-950">Active Projects</h3>
+        <button onClick={onViewAll} className="text-xs font-bold text-orange-600 hover:text-orange-700">
           View all →
         </button>
       </div>
@@ -341,14 +341,14 @@ function PendingApprovalCard({ approval }) {
   return (
     <div className="py-4 border-b border-neutral-100 last:border-none">
       <div className="flex items-center justify-between mb-1">
-        <p className="text-sm font-semibold text-neutral-900">{approval.teamName}</p>
-        <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+        <p className="text-sm font-bold text-neutral-900">{approval.teamName}</p>
+        <span className="flex items-center gap-1 text-xs font-semibold text-amber-600">
+          <span className="w-1.5 h-1.5 bg-amber-500" />
           {approval.status}
         </span>
       </div>
       <p className="text-sm text-neutral-700 leading-snug">{approval.title}</p>
-      <p className="text-xs text-neutral-500 mt-1">
+      <p className="text-xs text-neutral-500 mt-1 font-mono">
         {approval.department} · {approval.members} members ·{" "}
         {new Date(approval.submittedOn).toLocaleDateString("en-IN", {
           year: "numeric",
@@ -362,10 +362,10 @@ function PendingApprovalCard({ approval }) {
 
 function PendingTeamApprovals({ approvals, onReviewAll }) {
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white px-6 py-5">
+    <div className="border border-neutral-200 bg-white px-6 py-5">
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-base font-semibold text-neutral-900">Pending Team Approvals</h3>
-        <button onClick={onReviewAll} className="text-xs font-medium text-orange-600 hover:text-orange-700">
+        <h3 className="text-base font-bold text-neutral-950">Pending Team Approvals</h3>
+        <button onClick={onReviewAll} className="text-xs font-bold text-orange-600 hover:text-orange-700">
           Review all →
         </button>
       </div>
@@ -382,15 +382,15 @@ function IndustryRequestRow({ request }) {
   return (
     <div className="flex items-center justify-between py-3.5 border-b border-neutral-100 last:border-none">
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-9 h-9 rounded-lg bg-neutral-100 text-neutral-600 text-xs font-semibold flex items-center justify-center shrink-0">
+        <div className="w-9 h-9 bg-neutral-100 text-neutral-600 text-[10px] font-mono font-bold flex items-center justify-center shrink-0">
           {request.initials}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-medium text-neutral-900 truncate">{request.company}</p>
+          <p className="text-sm font-semibold text-neutral-900 truncate">{request.company}</p>
           <p className="text-xs text-neutral-500">{request.offer}</p>
         </div>
       </div>
-      <span className="text-xs font-semibold text-orange-600 bg-orange-50 rounded-full px-2.5 py-1 shrink-0">
+      <span className="text-xs font-mono font-bold text-orange-600 bg-orange-50 px-2.5 py-1 shrink-0">
         {request.value}
       </span>
     </div>
@@ -399,10 +399,10 @@ function IndustryRequestRow({ request }) {
 
 function IndustryRequests({ requests, onReviewAll }) {
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white px-6 py-5">
+    <div className="border border-neutral-200 bg-white px-6 py-5">
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-base font-semibold text-neutral-900">Industry Requests</h3>
-        <button onClick={onReviewAll} className="text-xs font-medium text-orange-600 hover:text-orange-700">
+        <h3 className="text-base font-bold text-neutral-950">Industry Requests</h3>
+        <button onClick={onReviewAll} className="text-xs font-bold text-orange-600 hover:text-orange-700">
           Review all →
         </button>
       </div>
@@ -422,14 +422,14 @@ function QuickActions({ actions, onAction }) {
     ghost: "bg-white text-neutral-700 border border-neutral-200 hover:bg-neutral-50",
   };
   return (
-    <div className="rounded-2xl border border-orange-100 bg-orange-50/50 px-6 py-5">
-      <h3 className="text-base font-semibold text-neutral-900 mb-4">Quick Actions</h3>
+    <div className="border border-orange-100 bg-orange-50/50 px-6 py-5">
+      <h3 className="text-base font-bold text-neutral-950 mb-4">Quick Actions</h3>
       <div className="space-y-2.5">
         {actions.map((action) => (
           <button
             key={action.id}
             onClick={() => onAction(action.path)}
-            className={`w-full text-left text-sm font-medium rounded-lg px-4 py-2.5 transition-colors ${toneClasses[action.tone]}`}
+            className={`w-full text-left text-sm font-semibold px-4 py-2.5 transition-colors ${toneClasses[action.tone]}`}
           >
             {action.label} →
           </button>
