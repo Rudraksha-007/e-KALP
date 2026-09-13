@@ -33,8 +33,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from routes import auth
 from database import Base, engine
-from models.ai_test import AIProblemTest
-from routes.ai_test import router as ai_test_router
 from routes.problems import router as problems_router
 
 
@@ -51,10 +49,7 @@ app = FastAPI(title="e-KALP", lifespan=lifespan)
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -62,7 +57,6 @@ app.add_middleware(
 
 
 app.include_router(auth.router)
-app.include_router(ai_test_router)
 app.include_router(problems_router)
 
 
