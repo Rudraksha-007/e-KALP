@@ -1,4 +1,4 @@
-# e-KALP 🧠🌏
+# e-KALP 🦢️✨️
 ### Turning Real-World Problems into Meaningful Change
 
 This is team Socialis Submission for the PS : SIH26043 as a part of the internal hackathon conducted by IET DAVV for SIH.
@@ -15,7 +15,7 @@ Team: **Socialis**
 
 ---
 
-## 📌 Overview
+## ⏩️ Overview
 
 **e-KALP** is a digital platform that crowdsources societal challenges from citizens and routes them — through an AI-powered pipeline — to the universities and industry partners best equipped to solve them.
 
