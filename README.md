@@ -1,6 +1,15 @@
 # e-KALP 🧠🌏
 ### Turning Real-World Problems into Meaningful Change
 
+This is team Socialis Submission for the PS : SIH26043 as a part of the internal hackathon conducted by IET DAVV for SIH.
+(have a look here : https://sih.gov.in/sih2026PS)
+
+
+Demo video link : https://drive.google.com/file/d/12t7SG62Yu3IEJLUwHFQrX72G8Nu8Aq3I/view
+Presentation link : https://canva.link/qbx9cgnwhze5hxm
+Arch. diagram : https://miro.com/app/board/uXjVGb9vtRE=/?focusWidget=3458764652460109277&embedMode=view_only_without_ui&embedId=265319121335
+AI Agentic Workflow is also right here (descriptor for n8n workflow): https://drive.google.com/file/d/1eVy9xQm6G_2H1kLG3n2SHD6gpRMgd7X4/view?usp=sharing
+
 **Smart India Hackathon 2026** | Problem Statement ID: `SIH26043` | Theme: **Smart Education** | Category: **Software**
 Team: **Socialis**
 
@@ -18,24 +27,10 @@ Citizen → AI Engine → Government Validation → University → Student Team 
 
 ---
 
-## 🚩 The Problem
-
-Communities across Jharkhand (and India more broadly) face recurring challenges in education, healthcare, agriculture, water management, sanitation, environment, rural livelihoods, accessibility, urban infrastructure, and public service delivery — but there is no structured mechanism for citizens to submit these problems for systematic evaluation and innovation-driven resolution.
-
-| Gap | Description |
-|---|---|
-| **Scattered citizen reports** | Problems arrive through disconnected, informal channels |
-| **Duplicate & conflicting data** | The same issue is reported many times with no deduplication |
-| **No intelligent prioritization** | Urgency and vulnerable communities aren't systematically identified |
-| **Disconnected universities** | Relevant academic expertise isn't linked to real problems |
-| **Weak industry linkage** | Student solutions lack funding, mentorship, and deployment support |
-| **Weak impact tracking** | No visibility from problem discovery to actual community outcome |
-
----
-
 ## 💡 Our Solution
 
-A **Societal Innovation Collaboration Portal** with role-based workflows for four stakeholder types:
+A **Societal Innovation Collaboration Portal** 
+with role-based workflows for four stakeholder types:
 
 - **Citizens / Communities** — submit problems via web app, mobile app, Telegram, or voice, with photos, video, and location
 - **Government Departments** — validate submitted problems and monitor domain-wise / district-wise dashboards
@@ -208,13 +203,5 @@ Outcomes  ── ✓ Solutions   ✓ Deployment   ✓ Real Impact
 - Manning, C. D., Raghavan, P., & Schütze, H. (2008). *Introduction to Information Retrieval.* Cambridge University Press.
 - Baeza-Yates, R., & Ribeiro-Neto, B. (1999). *Modern Information Retrieval.* Addison-Wesley.
 - [AICTE](https://www.aicte.gov.in/)
-
 ---
-
-## 👥 Team Socialis
-
-Built for **Smart India Hackathon 2026** under Problem Statement **SIH26043**.
-
----
-
 
