@@ -1,16 +1,26 @@
 import axios from "axios";
 
 /**
- * Central API client.
+ * Central API client configured for the deployed e-KALP backend.
  *
- * - Attaches the JWT (if present) to every request.
- * - Redirects to /role-selection on a 401 (expired/invalid token) so the
- *   user isn't left staring at a broken dashboard.
- * - All endpoint calls the app needs are grouped below so components never
- *   hand-roll a fetch/axios call — they import `authApi`, `problemApi`, etc.
+ * The deployed backend (FastAPI) exposes:
+ *   - POST /auth/{role}/signup   role ∈ { citizen, spocuni, teamlead }
+ *   - POST /auth/{role}/login
+ *   - GET  /problems             (list problem statements)
+ *
+ * There is NO `/api` prefix and no /auth/me, /auth/logout,
+ * /project-workspaces, /students or problem create/update/assign routes,
+ * so helpers for those have been dropped rather than left 404ing.
+ *
+ * The frontend uses its own role vocabulary
+ *   citizen | uni_spoc | industry_spoc | admin_gov
+ * while the backend understands
+ *   citizen | spocuni   | teamlead
+ * `toBackendRole` maps the overlap and throws a clear error for the roles
+ * the deployed backend does not implement yet (industry_spoc, admin_gov).
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -41,53 +51,33 @@ api.interceptors.response.use(
   }
 );
 
-export default api;
+const BACKEND_ROLES = {
+  citizen: "citizen",
+  uni_spoc: "spocuni",
+};
 
-/* ------------------------------------------------------------------ */
-/* Grouped endpoint helpers                                            */
-/* Maps 1:1 to the `user` table's `type` enum:                         */
-/*   citizen | uni_spoc | industry_spoc | admin_gov                    */
-/* ------------------------------------------------------------------ */
+export function toBackendRole(frontendRole) {
+  if (frontendRole === "industry_spoc" || frontendRole === "admin_gov") {
+    throw new Error(
+      `The deployed backend does not support the "${frontendRole}" account type yet. ` +
+        "Only citizen, spocuni (university) and teamlead accounts exist."
+    );
+  }
+  const backendRole = BACKEND_ROLES[frontendRole];
+  if (!backendRole) throw new Error(`Unknown role: ${frontendRole}`);
+  return backendRole;
+}
 
 export const authApi = {
-  // Citizen
-  citizenLogin: (payload) => api.post("/auth/citizen/login", payload),
-  citizenRegister: (payload) => api.post("/auth/citizen/register", payload),
-
-  // University SPOC
-  universityLogin: (payload) => api.post("/auth/university/login", payload),
-  universityRegister: (payload) => api.post("/auth/university/register", payload),
-
-  // Industry SPOC
-  industryLogin: (payload) => api.post("/auth/industry/login", payload),
-  industryRegister: (payload) => api.post("/auth/industry/register", payload),
-
-  // Admin / Govt — typically provisioned, not self-registered, but a
-  // register endpoint is included in case invite-based signup is added later.
-  adminLogin: (payload) => api.post("/auth/admin/login", payload),
-  adminRegister: (payload) => api.post("/auth/admin/register", payload),
-
-  me: () => api.get("/auth/me"),
-  logout: () => api.post("/auth/logout"),
+  /** POST /auth/{role}/login — returns { access_token, refresh_token, token_type } */
+  login: (role, payload) => api.post(`/auth/${toBackendRole(role)}/login`, payload),
+  /** POST /auth/{role}/signup — returns { status, message, data } */
+  signup: (role, payload) => api.post(`/auth/${toBackendRole(role)}/signup`, payload),
 };
 
 export const problemApi = {
-  list: (params) => api.get("/problem-statements", { params }),
-  get: (id) => api.get(`/problem-statements/${id}`),
-  create: (payload) => api.post("/problem-statements", payload),
-  update: (id, payload) => api.put(`/problem-statements/${id}`, payload),
-  assign: (id, assignedTo) =>
-    api.patch(`/problem-statements/${id}/assign`, { assigned_to: assignedTo }),
+  /** GET /problems — returns { total, limit, offset, items } */
+  list: (params) => api.get("/problems", { params }),
 };
 
-export const workspaceApi = {
-  list: (params) => api.get("/project-workspaces", { params }),
-  get: (id) => api.get(`/project-workspaces/${id}`),
-  create: (payload) => api.post("/project-workspaces", payload),
-  update: (id, payload) => api.put(`/project-workspaces/${id}`, payload),
-};
-
-export const studentApi = {
-  list: (params) => api.get("/students", { params }),
-  create: (payload) => api.post("/students", payload),
-};
+export default api;

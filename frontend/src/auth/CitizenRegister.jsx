@@ -13,6 +13,8 @@ const INITIAL_FORM = {
   phone: "",
   password: "",
   confirmPassword: "",
+  location: "",
+  occupation: "",
 };
 
 export default function CitizenRegister() {
@@ -43,7 +45,7 @@ export default function CitizenRegister() {
       const user = await register(ROLES.CITIZEN, { ...payload, age: Number(payload.age) });
       navigate(getDashboardPath(user.type), { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || "Could not create account. Please try again.");
+      setError(err.response?.data?.detail || err.message || "Could not create account. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -57,7 +59,7 @@ export default function CitizenRegister() {
       footer={
         <>
           Already have an account?{" "}
-          <Link to="/auth/citizen/login" className="font-semibold text-slate-900 hover:underline">
+          <Link to="/login" className="font-semibold text-slate-900 hover:underline">
             Log in
           </Link>
         </>
@@ -78,12 +80,22 @@ export default function CitizenRegister() {
               className="rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             >
               <option value="" disabled>Select</option>
-              <option value="female">Female</option>
-              <option value="male">Male</option>
-              <option value="other">Other</option>
+              <option value="F">Female</option>
+              <option value="M">Male</option>
             </select>
           </label>
         </div>
+
+        <FormField label="Location" type="text" name="location" value={form.location} onChange={handleChange} required placeholder="e.g. Namkum, Ranchi" />
+        <FormField
+          label="Occupation (lowercase, no spaces)"
+          type="text"
+          name="occupation"
+          value={form.occupation}
+          onChange={handleChange}
+          required
+          placeholder="e.g. farmer, teacher, student"
+        />
 
         <FormField label="Phone number" type="tel" name="phone" value={form.phone} onChange={handleChange} required autoComplete="tel" placeholder="9876543210" />
         <FormField label="Password" type="password" name="password" value={form.password} onChange={handleChange} required minLength={8} autoComplete="new-password" />

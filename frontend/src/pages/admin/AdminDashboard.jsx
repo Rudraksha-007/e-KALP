@@ -1,18 +1,17 @@
 import { useEffect, useState } from "react";
 import DashboardLayout from "../../components/Dashboard";
-import { problemApi, workspaceApi } from "../../services/api";
+import { problemApi } from "../../services/api";
 
 export default function AdminDashboard() {
   const [problems, setProblems] = useState([]);
-  const [workspaces, setWorkspaces] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.allSettled([problemApi.list(), workspaceApi.list()]).then(([problemsRes, workspacesRes]) => {
-      if (problemsRes.status === "fulfilled") setProblems(problemsRes.value.data.items ?? []);
-      if (workspacesRes.status === "fulfilled") setWorkspaces(workspacesRes.value.data.items ?? []);
-      setLoading(false);
-    });
+    problemApi
+      .list()
+      .then((res) => setProblems(res.data.items ?? []))
+      .catch(() => setProblems([]))
+      .finally(() => setLoading(false));
   }, []);
 
   const unassigned = problems.filter((p) => !p.assigned_to);
@@ -26,7 +25,7 @@ export default function AdminDashboard() {
           <section className="grid grid-cols-3 gap-4">
             <StatCard label="Total problem statements" value={problems.length} accent="text-emerald-600" />
             <StatCard label="Unassigned" value={unassigned.length} accent="text-red-500" />
-            <StatCard label="Active workspaces" value={workspaces.length} accent="text-emerald-600" />
+            <StatCard label="Active workspaces" value={0} accent="text-emerald-600" />
           </section>
 
           <section>
@@ -39,7 +38,9 @@ export default function AdminDashboard() {
                   <li key={p.id} className="flex items-center justify-between px-5 py-3 text-sm">
                     <div>
                       <p className="font-medium text-slate-900">{p.title}</p>
-                      <p className="text-slate-500">{p.category}</p>
+                      <p className="text-slate-500">
+                        {(p.categories || []).join(", ") || p.status}
+                      </p>
                     </div>
                     <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600">
                       Unassigned

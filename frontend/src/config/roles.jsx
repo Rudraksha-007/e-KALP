@@ -84,8 +84,11 @@
 /**
  * Single source of truth for account types.
  *
- * `value` MUST match the `user.type` values used by the backend/schema:
- *   citizen | uni_spoc | industry_spoc | admin_gov
+ * These are the FRONTEND role values (used for routing, gating and labels).
+ * The deployed backend uses its own vocabulary — citizen | spocuni | teamlead —
+ * and `services/api.js` (`toBackendRole`) maps citizen → citizen and
+ * uni_spoc → spocuni. industry_spoc / admin_gov have no backend counterpart
+ * yet and login/register will surface a clear error for them.
  *
  * Everything else (routes, dashboard paths, labels) is derived from this
  * file so adding a new role never means hunting through the codebase.
@@ -102,9 +105,9 @@ export const roles = [
   {
     value: ROLES.CITIZEN,
     name: "Citizen",
-    loginRoute: "/auth/citizen/login",
-    registerRoute: "/auth/citizen/register",
-    dashboardRoute: "/citizen/dashboard",
+    loginRoute: "/login",
+    registerRoute: "/register",
+    dashboardRoute: "/dashboard",
     description: "Join your community, report issues and contribute to local development.",
     ring: "group-hover:ring-blue-500/40",
     iconWrap: "text-blue-600 bg-blue-50",

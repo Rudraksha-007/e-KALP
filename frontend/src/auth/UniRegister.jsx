@@ -4,17 +4,15 @@ import AuthCard, { FormField, SubmitButton } from "../components/AuthCard";
 import { useAuth } from "../context/AuthContext";
 import { ROLES, getDashboardPath } from "../config/roles";
 
-// `user` columns + `spoc_university` columns (address, location/city, proj_fields)
+// Matches the deployed backend's `spocuni` signup schema:
+// { uni_name, name, subject_expertise, problems_proposal, phone_number, password }
 const INITIAL_FORM = {
+  uniName: "",
   name: "",
-  age: "",
-  gender: "",
   phone: "",
   password: "",
   confirmPassword: "",
-  address: "",
-  city: "",
-  projFields: "", // comma-separated, e.g. "education, agriculture"
+  subjectExpertise: "", // comma-separated, e.g. "electronics, agriculture"
 };
 
 export default function UniversityRegister() {
@@ -41,19 +39,20 @@ export default function UniversityRegister() {
 
     setSubmitting(true);
     try {
-      const { confirmPassword, projFields, ...rest } = form;
       const payload = {
-        ...rest,
-        age: Number(rest.age),
-        proj_fields: projFields
+        uniName: form.uniName,
+        name: form.name,
+        subjectExpertise: form.subjectExpertise
           .split(",")
-          .map((f) => f.trim())
+          .map((s) => s.trim())
           .filter(Boolean),
+        phone: form.phone,
+        password: form.password,
       };
       const user = await register(ROLES.UNI_SPOC, payload);
       navigate(getDashboardPath(user.type), { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || "Could not create account. Please try again.");
+      setError(err.response?.data?.detail || err.message || "Could not create account. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -74,37 +73,17 @@ export default function UniversityRegister() {
       }
     >
       <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+        <FormField label="University name" type="text" name="uniName" value={form.uniName} onChange={handleChange} required autoComplete="organization" />
         <FormField label="SPOC full name" type="text" name="name" value={form.name} onChange={handleChange} required autoComplete="name" />
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Age" type="number" name="age" min="1" value={form.age} onChange={handleChange} required />
-          <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-900">
-            Gender
-            <select
-              name="gender"
-              value={form.gender}
-              onChange={handleChange}
-              required
-              className="rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-            >
-              <option value="" disabled>Select</option>
-              <option value="female">Female</option>
-              <option value="male">Male</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-        </div>
-
         <FormField label="Phone number" type="tel" name="phone" value={form.phone} onChange={handleChange} required autoComplete="tel" />
-        <FormField label="University address" type="text" name="address" value={form.address} onChange={handleChange} required />
-        <FormField label="City / location" type="text" name="city" value={form.city} onChange={handleChange} required />
         <FormField
-          label="Project fields (comma-separated)"
+          label="Subject expertise (comma-separated)"
           type="text"
-          name="projFields"
-          value={form.projFields}
+          name="subjectExpertise"
+          value={form.subjectExpertise}
           onChange={handleChange}
-          placeholder="education, agriculture"
+          placeholder="electronics, agriculture, civil"
         />
 
         <FormField label="Password" type="password" name="password" value={form.password} onChange={handleChange} required minLength={8} autoComplete="new-password" />

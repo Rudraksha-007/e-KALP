@@ -55,7 +55,7 @@ export default function IndustryRegister() {
       const user = await register(ROLES.INDUSTRY_SPOC, payload);
       navigate(getDashboardPath(user.type), { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || "Could not create account. Please try again.");
+      setError(err.response?.data?.detail || err.message || "Could not create account. Please try again.");
     } finally {
       setSubmitting(false);
     }

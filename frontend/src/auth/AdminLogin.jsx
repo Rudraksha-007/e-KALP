@@ -30,7 +30,7 @@ export default function AdminLogin() {
       const user = await login(ROLES.ADMIN_GOV, form);
       navigate(getDashboardPath(user.type), { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || "Invalid phone number or password.");
+      setError(err.response?.data?.detail || err.message || "Invalid phone number or password.");
     } finally {
       setSubmitting(false);
     }

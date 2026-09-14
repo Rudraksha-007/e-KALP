@@ -13,34 +13,25 @@ const USER_KEY = "user";
  * JWT. ProtectedRoute reads `role` from here to gate pages.
  */
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null); // { id, name, type, ... }
-  const [loading, setLoading] = useState(true); // true while we re-hydrate from localStorage/API
+  const [user, setUser] = useState(null); // { type, ... }
+  const [loading, setLoading] = useState(true); // true while we re-hydrate from localStorage
 
-  // Re-hydrate on first load (page refresh) from localStorage, then confirm
-  // the token is still valid against the backend.
+  // Re-hydrate on first load (page refresh) from localStorage. The deployed
+  // backend has no /auth/me endpoint, so we trust the cached session; any
+  // real API call that returns 401 is handled globally by api.js.
   useEffect(() => {
     const storedUser = localStorage.getItem(USER_KEY);
     const token = localStorage.getItem(TOKEN_KEY);
 
-    if (!token || !storedUser) {
-      setLoading(false);
-      return;
+    if (token && storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+      }
     }
-
-    setUser(JSON.parse(storedUser));
-
-    authApi
-      .me()
-      .then((res) => {
-        setUser(res.data.user);
-        localStorage.setItem(USER_KEY, JSON.stringify(res.data.user));
-      })
-      .catch(() => {
-        // Token expired/invalid — the api.js response interceptor already
-        // clears storage and redirects; just clear local state here.
-        setUser(null);
-      })
-      .finally(() => setLoading(false));
+    setLoading(false);
   }, []);
 
   const persistSession = useCallback((token, userData) => {
@@ -50,56 +41,84 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
+   * Login against the deployed backend.
+   *
    * @param {"citizen"|"uni_spoc"|"industry_spoc"|"admin_gov"} role
-   * @param {{phone: string, password: string}} credentials
+   * @param {{phone?: string, phone_number?: string, password: string}} credentials
+   * @param {Record<string, unknown>} [extraUser] merged into the stored user object
    */
   const login = useCallback(
-    async (role, credentials) => {
-      const loginFn = {
-        citizen: authApi.citizenLogin,
-        uni_spoc: authApi.universityLogin,
-        industry_spoc: authApi.industryLogin,
-        admin_gov: authApi.adminLogin,
-      }[role];
+    async (role, credentials, extraUser = {}) => {
+      const payload = {
+        phone_number: credentials.phone_number ?? credentials.phone,
+        password: credentials.password,
+      };
+      const { data } = await authApi.login(role, payload);
 
-      if (!loginFn) throw new Error(`Unknown role: ${role}`);
+      const token =
+        data.access_token ??
+        data.token ??
+        (data.tokens && data.tokens.access_token);
+      if (!token) throw new Error("Backend returned no access token.");
 
-      const { data } = await loginFn(credentials);
-      persistSession(data.token, data.user);
-      return data.user;
+      const userData = { type: role, name: credentials.name || extraUser.name || null };
+      persistSession(token, userData);
+      return userData;
     },
     [persistSession]
   );
 
   /**
-   * @param {"citizen"|"uni_spoc"|"industry_spoc"|"admin_gov"} role
-   * @param {object} formData role-specific registration payload
+   * Build the role-specific payload the deployed backend schema expects.
+   * Currency check: both citizen and spocuni signups require exactly the
+   * fields below (the backend forbids unknown keys).
+   */
+  const buildSignupPayload = useCallback((role, formData) => {
+    if (role === "citizen") {
+      return {
+        name: formData.name,
+        phone_number: formData.phone_number ?? formData.phone,
+        password: formData.password,
+        location: formData.location,
+        occupation: formData.occupation,
+        age: Number(formData.age),
+        gender: (formData.gender || "").toUpperCase(),
+      };
+    }
+    if (role === "uni_spoc") {
+      return {
+        uni_name: formData.uniName,
+        name: formData.name,
+        subject_expertise: formData.subjectExpertise ?? [],
+        problems_proposal: formData.problemsProposal ?? [],
+        phone_number: formData.phone_number ?? formData.phone,
+        password: formData.password,
+      };
+    }
+    throw new Error(
+      `The deployed backend does not support registration for "${role}".`
+    );
+  }, []);
+
+  /**
+   * Register, then immediately log in so the user lands on their dashboard.
+   * (Signup returns no tokens — only the login endpoint issues them.)
    */
   const register = useCallback(
     async (role, formData) => {
-      const registerFn = {
-        citizen: authApi.citizenRegister,
-        uni_spoc: authApi.universityRegister,
-        industry_spoc: authApi.industryRegister,
-        admin_gov: authApi.adminRegister,
-      }[role];
-
-      if (!registerFn) throw new Error(`Unknown role: ${role}`);
-
-      const { data } = await registerFn(formData);
-      // Auto-login after successful registration if the API returns a token.
-      if (data.token) {
-        persistSession(data.token, data.user);
-      }
-      return data.user;
+      const payload = buildSignupPayload(role, formData);
+      await authApi.signup(role, payload);
+      return login(role, {
+        phone: payload.phone_number,
+        password: payload.password,
+        name: payload.name,
+      });
     },
-    [persistSession]
+    [buildSignupPayload, login]
   );
 
   const logout = useCallback(() => {
-    authApi.logout().catch(() => {
-      /* best-effort — clear local state regardless */
-    });
+    // The backend has no /auth/logout route; clearing tokens locally is all.
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     setUser(null);

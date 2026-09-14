@@ -43,13 +43,13 @@ function Navbar() {
 
       <div className="flex items-center gap-6">
         <button
-          onClick={() => navigate("/select-role")}
+          onClick={() => navigate("/login")}
           className="text-[11px] tracking-[0.15em] text-white/80 font-mono hidden sm:inline hover:text-white transition-colors"
         >
           LOGIN
         </button>
         <button
-          onClick={() => navigate("/select-role")}
+          onClick={() => navigate("/register")}
           className="bg-orange-500 hover:bg-orange-600 transition-colors text-white text-[11px] tracking-[0.15em] font-mono px-4 py-2.5 flex items-center gap-2"
         >
           GET STARTED <span>→</span>
@@ -100,12 +100,15 @@ function Hero() {
 
         <div className="mt-9 flex items-center gap-8 flex-wrap">
           <button
-            onClick={() => navigate("/select-role")}
+            onClick={() => navigate("/register")}
             className="bg-orange-500 hover:bg-orange-600 transition-colors text-white text-[11px] tracking-[0.15em] font-mono px-6 py-4 flex items-center gap-2"
           >
             REPORT A PROBLEM <span>→</span>
           </button>
-          <button className="text-white text-[11px] tracking-[0.15em] font-mono flex items-center gap-2 border-b border-white/40 pb-1 hover:border-white transition-colors">
+          <button
+            onClick={() => navigate("/login")}
+            className="text-white text-[11px] tracking-[0.15em] font-mono flex items-center gap-2 border-b border-white/40 pb-1 hover:border-white transition-colors"
+          >
             EXPLORE PROBLEMS <span>→</span>
           </button>
         </div>
@@ -343,7 +346,7 @@ function CallToAction() {
           </p>
 
           <button
-            onClick={() => navigate("/select-role")}
+            onClick={() => navigate("/register")}
             className="mt-10 bg-orange-500 hover:bg-orange-600 transition-colors text-white text-[11px] tracking-[0.15em] font-mono px-7 py-4 inline-flex items-center gap-2"
           >
             GET STARTED <span>→</span>
@@ -374,7 +377,7 @@ function Footer() {
         <span>ABOUT</span>
         <span>HOW IT WORKS</span>
         <span>IMPACT</span>
-        <button onClick={() => navigate("/select-role")} className="hover:text-white transition-colors">
+        <button onClick={() => navigate("/login")} className="hover:text-white transition-colors">
           LOGIN
         </button>
         <span>© 2025 PORTAL INITIATIVE</span>
