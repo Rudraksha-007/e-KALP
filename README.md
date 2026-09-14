@@ -6,9 +6,13 @@ This is team Socialis Submission for the PS : SIH26043 as a part of the internal
 
 
 Demo video link : https://drive.google.com/file/d/12t7SG62Yu3IEJLUwHFQrX72G8Nu8Aq3I/view
+
 Presentation link : https://canva.link/qbx9cgnwhze5hxm
+
 Arch. diagram : https://miro.com/app/board/uXjVGb9vtRE=/?focusWidget=3458764652460109277&embedMode=view_only_without_ui&embedId=265319121335
+
 AI Agentic Workflow is also right here (descriptor for n8n workflow): https://drive.google.com/file/d/1eVy9xQm6G_2H1kLG3n2SHD6gpRMgd7X4/view?usp=sharing
+
 
 **Smart India Hackathon 2026** | Problem Statement ID: `SIH26043` | Theme: **Smart Education** | Category: **Software**
 Team: **Socialis**
