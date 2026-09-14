@@ -1,7 +1,27 @@
-fastapi==0.141.1
-pwdlib==0.3.1
-pydantic==2.13.5
-pydantic_settings==2.15.0
-PyJWT==2.14.0
-SQLAlchemy==2.0.52
-uvicorn[standard]
+# ---------------------------------------------------------------------------
+# Web framework & server
+# ---------------------------------------------------------------------------
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+
+# ---------------------------------------------------------------------------
+# Data validation / settings
+# ---------------------------------------------------------------------------
+pydantic>=2.8.0
+pydantic-settings>=2.4.0
+email-validator>=2.2.0          # required for pydantic EmailStr
+python-dotenv>=1.0.1            # required for SettingsConfigDict(env_file=".env")
+
+# ---------------------------------------------------------------------------
+# Database (async PostgreSQL)
+# ---------------------------------------------------------------------------
+sqlalchemy[asyncio]>=2.0.30
+asyncpg>=0.29.0                 # driver for postgresql+asyncpg://
+
+# ---------------------------------------------------------------------------
+# Auth: JWT + password hashing
+# ---------------------------------------------------------------------------
+PyJWT>=2.9.0
+pwdlib[argon2]>=0.2.0           # PasswordHash.recommended() -> Argon2
+argon2-cffi>=23.1.0             # explicit argon2 backend for pwdlib
+psycopg2
