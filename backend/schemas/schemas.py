@@ -196,6 +196,11 @@ class ProblemStatementResponse(ORMBase):
     proposals: dict[str, Any] = Field(default_factory=dict)
     date_reported: datetime
     categories: list[str] = Field(default_factory=list)
+    model_config = ConfigDict(
+        from_attributes=True,
+        str_strip_whitespace=True,
+        ser_json_bytes="base64",  # <-- the fix
+    )
 
 
 class ProblemListResponse(BaseModel):
@@ -203,3 +208,15 @@ class ProblemListResponse(BaseModel):
     limit: int
     offset: int
     items: list[ProblemStatementResponse]
+
+
+class ProblemCreate(InputBase):
+    title: str = Field(..., min_length=1, max_length=500)
+    pd: str = Field(..., min_length=1)
+    # Base64-encoded blobs. Fine for small images; switch to multipart
+    # uploads + object storage when this outgrows a hackathon.
+    photos: list[str] = Field(default_factory=list)
+    videos: list[str] = Field(default_factory=list)
+    longitude: float = Field(..., ge=-180, le=180)
+    latitude: float = Field(..., ge=-90, le=90)
+    categories: list[str] = Field(default_factory=list)

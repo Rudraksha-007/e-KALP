@@ -37,6 +37,7 @@ from models.ai_test import AIProblemTest
 from routes.ai_test import router as ai_test_router
 from routes.problems import router as problems_router
 from routes.profile import router as profile_router
+from routes.peasant import router as citizen_router
 
 
 @asynccontextmanager
@@ -66,6 +67,7 @@ app.include_router(auth.router)
 app.include_router(ai_test_router)
 app.include_router(problems_router)
 app.include_router(profile_router)
+app.include_router(citizen_router)
 
 
 @app.get("/")
