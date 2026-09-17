@@ -220,3 +220,33 @@ class ProblemCreate(InputBase):
     longitude: float = Field(..., ge=-180, le=180)
     latitude: float = Field(..., ge=-90, le=90)
     categories: list[str] = Field(default_factory=list)
+
+
+# ------------------------------ SPOC pitch ---------------------------------- #
+class PitchCreate(InputBase):
+    problem_id: UUID
+    team_lead_token: int
+
+
+class TeamLeadBrief(ORMBase):
+    id: UUID
+    token: int
+    name: str
+    email: EmailStr
+    uni_id: int
+
+
+class ProblemBrief(ORMBase):
+    id: UUID
+    token_number: int
+    title: str
+    status: ProblemStatus
+    date_reported: datetime
+    categories: list[str] = Field(default_factory=list)
+
+
+class PitchResponse(ORMBase):
+    id: UUID
+    spoc_id: UUID
+    problem: ProblemBrief
+    team_lead: TeamLeadBrief
