@@ -4,7 +4,7 @@ import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
-
+from uuid import UUID
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -237,3 +237,18 @@ def require_role(*allowed_roles: UserRole):
         return user
 
     return dependency
+
+
+def get_and_identify_payload(payload: dict) -> tuple[str, UUID]:
+    try:
+        role = payload["role"]
+        user_id = UUID(payload["sub"])
+    except KeyError as e:
+        raise ValueError(f"Missing claim in token payload: {e.args[0]}") from None
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"Invalid 'sub' claim: {payload.get('sub')!r}") from e
+
+    if not isinstance(role, str) or not role:
+        raise ValueError(f"Invalid 'role' claim: {role!r}")
+
+    return role, user_id

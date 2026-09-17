@@ -1,6 +1,6 @@
 import enum
 import secrets
-
+from sqlalchemy import func
 from sqlalchemy import (
     ARRAY,
     JSON,
@@ -56,11 +56,13 @@ class University(Base):
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
     # Random registration number handed to the SPOC at signup.
+
     registration_number = Column(
         BigInteger,
         unique=True,
         nullable=False,
         default=random_registration_number,
+        server_default=text("floor(random() * 9000000000 + 1000000000)::bigint"),
     )
     name = Column(Text, nullable=False)
 
@@ -71,7 +73,6 @@ class Citizen(Base):
     id = Column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
-    # Denormalised list of problem_statements.id this citizen reported.
     problems = Column(
         ARRAY(UUID(as_uuid=True)),
         nullable=False,
@@ -116,9 +117,6 @@ class Citizen(Base):
     )
 
 
-# --------------------------------------------------------------------------- #
-# ProblemStatement
-# --------------------------------------------------------------------------- #
 class ProblemStatement(Base):
     __tablename__ = "problem_statements"
 
@@ -131,7 +129,6 @@ class ProblemStatement(Base):
     title = Column(Text, nullable=False)
     pd = Column(Text, nullable=False)
 
-    # BLOB storage (Postgres BYTEA). See notes below — object storage is better.
     photos = Column(
         ARRAY(LargeBinary), nullable=False, server_default=text("'{}'::bytea[]")
     )
