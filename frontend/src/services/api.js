@@ -10,7 +10,7 @@ import axios from "axios";
  *   hand-roll a fetch/axios call — they import `authApi`, `problemApi`, etc.
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -52,11 +52,20 @@ export default api;
 export const authApi = {
   // Citizen
   citizenLogin: (payload) => api.post("/auth/citizen/login", payload),
-  citizenRegister: (payload) => api.post("/auth/citizen/register", payload),
+  citizenRegister: (payload) => api.post("/auth/citizen/signup", payload),
+  citizenMe: () => api.get("/user/citizen/me"),
 
-  // University SPOC
+  // University — SPOC (single point of contact)
   universityLogin: (payload) => api.post("/auth/university/login", payload),
   universityRegister: (payload) => api.post("/auth/university/register", payload),
+  spocLogin: (payload) => api.post("/auth/spocuni/login", payload),
+  spocRegister: (payload) => api.post("/auth/spocuni/signup", payload),
+  spocMe: () => api.get("/user/spocuni/me"),
+
+  // University — Team Lead
+  teamLeadLogin: (payload) => api.post("/auth/teamlead/login", payload),
+  teamLeadRegister: (payload) => api.post("/auth/teamlead/signup", payload),
+  teamLeadMe: () => api.get("/user/teamlead/me"),
 
   // Industry SPOC
   industryLogin: (payload) => api.post("/auth/industry/login", payload),
@@ -67,17 +76,33 @@ export const authApi = {
   adminLogin: (payload) => api.post("/auth/admin/login", payload),
   adminRegister: (payload) => api.post("/auth/admin/register", payload),
 
-  me: () => api.get("/auth/me"),
+  me: (role) => api.get(`/user/${role}/me`),
   logout: () => api.post("/auth/logout"),
 };
 
+// University SPOC endpoints (backend/routes/univ.py). `evaluate` lists the
+// SPOC's pitches (problem + assigned team lead); `pitch` assigns a team lead
+// token to a problem. Both require a spocuni JWT.
+export const univApi = {
+  evaluate: () => api.get("/univ/evaluate"),
+  teamLeads: () => api.get("/univ/team-leads"),
+  pitch: (payload) => api.post("/univ/pitch", payload),
+  problems: (params) => api.get("/problems", { params }),
+};
+
 export const problemApi = {
-  list: (params) => api.get("/problem-statements", { params }),
-  get: (id) => api.get(`/problem-statements/${id}`),
-  create: (payload) => api.post("/problem-statements", payload),
-  update: (id, payload) => api.put(`/problem-statements/${id}`, payload),
+  list: (params) => api.get("/problems", { params }),
+  get: (id) => api.get(`/problems/${id}`),
+  create: (payload) => api.post("/problems", payload),
+  update: (id, payload) => api.put(`/problems/${id}`, payload),
   assign: (id, assignedTo) =>
-    api.patch(`/problem-statements/${id}/assign`, { assigned_to: assignedTo }),
+    api.patch(`/problems/${id}/assign`, { assigned_to: assignedTo }),
+};
+
+// Citizen-facing endpoints (backend/routes/peasant.py).
+export const citizenApi = {
+  reportProblem: (payload) => api.post("/citizen/reportProblem", payload),
+  myProblems: (params) => api.get("/citizen/myProblems", { params }),
 };
 
 export const workspaceApi = {

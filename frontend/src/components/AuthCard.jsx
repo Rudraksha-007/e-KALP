@@ -1,17 +1,16 @@
-import { Link } from "react-router-dom";
-
 /**
  * Shared visual shell for every login/register page so CitizenLogin,
  * UniversityRegister, etc. only need to supply their form fields.
  */
+import Logo from "./Logo";
+
 export default function AuthCard({ title, subtitle, footer, error, children }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6 py-12">
       <div className="w-full max-w-md rounded-[20px] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-900/5">
-        <Link to="/" className="mb-6 inline-block text-sm text-slate-500 hover:text-slate-900">
-          ← Choose a different account type
-        </Link>
-
+        <div className="mb-6 flex justify-center">
+          <Logo height={36} tile />
+        </div>
         <h1 className="mb-1 text-2xl font-semibold text-slate-900">{title}</h1>
         {subtitle && <p className="mb-7 text-sm text-slate-500">{subtitle}</p>}
 

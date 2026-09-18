@@ -7,6 +7,7 @@ import LandingPage from "./pages/LandingPage";
 import RoleSelection from "./pages/RoleSelection";
 import SignUppage from "./pages/SignUppage";
 import Unauthorized from "./pages/Unauthorized";
+import ProblemsPage from "./pages/ProblemsPage";
 
 import CitizenLogin from "./auth/CitizenLogin";
 import CitizenRegister from "./auth/CitizenRegister";
@@ -26,6 +27,7 @@ import Approvals from "./pages/university/Approvals";
 import Industry from "./pages/university/Industry";
 import Projects from "./pages/university/Projects";
 import ProjectDetail from "./pages/university/ProjectDetail";
+import UniversityProfile from "./pages/university/Profile";
 
 
 import IndustryDashboard from "./pages/industry/IndustryDashboard";
@@ -43,6 +45,7 @@ export default function App() {
           <Route path="/select-role" element={<RoleSelection />} />
           <Route path="/signup" element={<SignUppage />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/problems" element={<ProblemsPage />} />
           <Route path="/citizen/dashboard" element={<CitizenDashboard />} />
           <Route path="/citizen" element={<CitizenLayout />}>
             <Route path="dashboard" element={<CitizenDashboard />} />
@@ -111,6 +114,14 @@ export default function App() {
             element={
               // <ProtectedRoute allowedRoles={[ROLES.UNI_SPOC]}>
                 <ProjectDetail />
+              // </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/university/profile"
+            element={
+              // <ProtectedRoute allowedRoles={[ROLES.UNI_SPOC]}>
+                <UniversityProfile />
               // </ProtectedRoute>
             }
           />

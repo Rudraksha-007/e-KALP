@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { authApi } from "../services/api";
 import { getDashboardPath } from "../config/roles";
 
@@ -15,6 +16,7 @@ const USER_KEY = "user";
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null); // { id, name, type, ... }
   const [loading, setLoading] = useState(true); // true while we re-hydrate from localStorage/API
+  const navigate = useNavigate();
 
   // Re-hydrate on first load (page refresh) from localStorage, then confirm
   // the token is still valid against the backend.
@@ -30,15 +32,18 @@ export function AuthProvider({ children }) {
     setUser(JSON.parse(storedUser));
 
     authApi
-      .me()
+      .me(storedUser.type)
       .then((res) => {
-        setUser(res.data.user);
-        localStorage.setItem(USER_KEY, JSON.stringify(res.data.user));
+        // Backend returns { role, ... } directly; map role -> type to match
+        // the shape the rest of the app expects.
+        const user = { ...res.data, type: res.data.role };
+        setUser(user);
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
       })
       .catch(() => {
-        // Token expired/invalid — the api.js response interceptor already
-        // clears storage and redirects; just clear local state here.
-        setUser(null);
+        // Keep the stored session on non-401 refresh failures (network/5xx).
+        // The api.js response interceptor already clears storage and
+        // redirects to "/" when the token is genuinely invalid (401).
       })
       .finally(() => setLoading(false));
   }, []);
@@ -103,7 +108,9 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     setUser(null);
-  }, []);
+    // Always land the user back on the public home page.
+    navigate("/");
+  }, [navigate]);
 
   const value = {
     user,

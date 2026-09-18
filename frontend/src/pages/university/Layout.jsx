@@ -1,54 +1,42 @@
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Search, Bell, LayoutGrid, CheckCircle2, Building2, Folder, Star } from "lucide-react";
+import { Search, Bell, LayoutGrid, CheckCircle2, Building2, Folder, User, LogOut } from "lucide-react";
+import Logo from "../../components/Logo";
+import { useAuth } from "../../context/AuthContext";
 
 /**
  * ------------------------------------------------------------------
  *  SHARED NAV CONFIG
- *  Badge counts are dummy data for now. In a real app these would
- *  come from a context/store fed by the backend (e.g. unread counts
- *  from /api/summary) so every page shows the same live numbers.
+ *  Badge counts are derived from live data at render time (see
+ *  UniversityDashboard). This config stays static.
  * ------------------------------------------------------------------
  */
 export const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", path: "/university/dashboard", icon: LayoutGrid, badge: null },
-  { id: "approvals", label: "Approvals", path: "/university/approvals", icon: CheckCircle2, badge: 3 },
-  { id: "industry", label: "Industry", path: "/university/industry", icon: Building2, badge: 3 },
+  { id: "approvals", label: "Team Assign", path: "/university/approvals", icon: CheckCircle2, badge: null },
+  { id: "industry", label: "Industry", path: "/university/industry", icon: Building2, badge: null },
   { id: "projects", label: "Projects", path: "/university/projects", icon: Folder, badge: null },
 ];
 
-export const CURRENT_USER = {
-  name: "Dr. Meera Rao",
-  avatarInitials: "MR",
-};
+function initialsFromName(name) {
+  return (
+    name
+      ?.split(/\s+/)
+      .map((p) => p[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U"
+  );
+}
 
-export const INSTITUTE = {
-  name: "VJTI Mumbai",
-  term: "Autumn 2024",
-  initials: "VJ",
-};
-
-function Sidebar({ navItems, institute, user }) {
+function Sidebar({ navItems, user }) {
   return (
     <aside className="w-60 shrink-0 border-r border-neutral-200 bg-white flex flex-col h-screen sticky top-0">
-      <div className="flex items-center gap-2 px-5 py-5">
-        <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center">
-          <Star className="w-4 h-4 text-white fill-white" />
-        </div>
-        <span className="font-semibold text-neutral-900 text-lg">e-KALP</span>
+      <div className="flex items-center justify-center px-5 py-4 border-b border-neutral-200">
+        <Logo height={26} tile />
       </div>
 
-      <div className="mx-4 mb-6 rounded-xl bg-neutral-50 border border-neutral-200 px-3 py-2.5 flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-neutral-200 text-neutral-600 text-xs font-semibold flex items-center justify-center shrink-0">
-          {institute.initials}
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-neutral-900 truncate">{institute.name}</p>
-          <p className="text-xs text-neutral-500">{institute.term}</p>
-        </div>
-      </div>
-
-      <div className="px-5 mb-2">
+      <div className="px-5 mt-6 mb-2">
         <span className="text-[11px] font-medium tracking-wide text-neutral-400">
           Navigation
         </span>
@@ -94,19 +82,29 @@ function Sidebar({ navItems, institute, user }) {
         })}
       </nav>
 
-      <div className="px-4 py-4 border-t border-neutral-200 flex items-center gap-2.5">
+      <NavLink
+        to="/university/profile"
+        title="View profile"
+        className={({ isActive }) =>
+          `border-t border-neutral-200 px-4 py-3.5 flex items-center gap-2.5 transition-colors ${
+            isActive ? "bg-orange-50" : "hover:bg-neutral-50"
+          }`
+        }
+      >
         <div className="w-8 h-8 rounded-full bg-neutral-800 text-white text-xs font-semibold flex items-center justify-center shrink-0">
           {user.avatarInitials}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-neutral-900 truncate">{user.name}</p>
         </div>
-      </div>
+        <User className="w-4 h-4 text-neutral-400 shrink-0" />
+      </NavLink>
     </aside>
   );
 }
 
 function TopBar({ pageTitle }) {
+  const { logout } = useAuth();
   return (
     <header className="flex items-center justify-between px-8 py-5 border-b border-neutral-200 bg-white">
       <h1 className="text-xl font-semibold text-neutral-900">{pageTitle}</h1>
@@ -126,6 +124,13 @@ function TopBar({ pageTitle }) {
           <Bell className="w-4 h-4 text-neutral-600" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-orange-500" />
         </button>
+        <button
+          onClick={logout}
+          title="Log out"
+          className="w-9 h-9 rounded-lg border border-neutral-200 flex items-center justify-center text-neutral-600 hover:bg-neutral-50 hover:text-orange-600"
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
       </div>
     </header>
   );
@@ -140,9 +145,16 @@ function TopBar({ pageTitle }) {
  *   </Layout>
  */
 export default function Layout({ pageTitle, children }) {
+  const { user } = useAuth();
+
+  const sidebarUser = {
+    name: user?.name ?? "—",
+    avatarInitials: initialsFromName(user?.name),
+  };
+
   return (
     <div className="min-h-screen bg-neutral-50 flex text-neutral-900 font-sans">
-      <Sidebar navItems={NAV_ITEMS} institute={INSTITUTE} user={CURRENT_USER} />
+      <Sidebar navItems={NAV_ITEMS} user={sidebarUser} />
       <div className="flex-1 min-w-0">
         <TopBar pageTitle={pageTitle} />
         <main className="px-8 py-6 space-y-6 max-w-[1400px]">{children}</main>

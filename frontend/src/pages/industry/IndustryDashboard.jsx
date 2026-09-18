@@ -2,8 +2,10 @@ import React, { useState } from "react";
 import {
   LayoutGrid, Search, Users, Bell, ChevronRight, ChevronLeft, ChevronDown,
   Hourglass, FileText, Package, ArrowRight, CheckCircle2, Circle, Clock,
-  MapPin, GraduationCap, Cpu, ArrowUpRight
+  MapPin, GraduationCap, Cpu, ArrowUpRight, LogOut
 } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import Logo from "../../components/Logo";
 
 /* ------------------------------------------------------------------ */
 /* Mock data (unchanged)                                                */
@@ -185,15 +187,9 @@ const Sidebar = ({ active, go }) => {
   ];
   return (
     <aside className="w-64 shrink-0 bg-white border-r border-slate-200 h-screen sticky top-0 flex flex-col overflow-hidden">
-      <div className="px-5 py-5 flex items-center gap-2.5 border-b border-slate-100 shrink-0">
-        <div className="relative w-9 h-9 shrink-0">
-          <div className="absolute top-0 left-0 w-6 h-6 bg-slate-900" />
-          <div className="absolute bottom-0 right-0 w-5 h-5 bg-orange-500" />
-        </div>
-        <div className="min-w-0">
-          <p className="font-bold text-[16px] leading-tight text-slate-900 truncate">e-KALP</p>
-          <p className={`text-[10px] font-semibold text-orange-500 ${mono}`}>INDUSTRY PORTAL</p>
-        </div>
+      <div className="px-5 py-4 border-b border-slate-100 shrink-0">
+        <Logo height={26} tile />
+        <p className={`mt-2 text-[10px] font-semibold text-orange-500 ${mono}`}>INDUSTRY PORTAL</p>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
@@ -236,14 +232,23 @@ const Sidebar = ({ active, go }) => {
   );
 };
 
-const TopBar = ({ title }) => (
+const TopBar = ({ title }) => {
+  const { logout } = useAuth();
+  return (
   <div className="sticky top-0 z-20 bg-white border-b border-slate-200">
     <div className="flex items-center justify-between px-8 py-4">
       <h1 className="text-lg font-bold text-slate-900">{title}</h1>
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-3">
         <button className="relative text-slate-400 hover:text-slate-600">
           <Bell size={19} />
           <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange-500 ring-2 ring-white" />
+        </button>
+        <button
+          onClick={logout}
+          title="Log out"
+          className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-orange-600 hover:bg-slate-50 rounded-md border border-slate-200"
+        >
+          <LogOut size={18} />
         </button>
         <button className="flex items-center gap-2.5">
           <span className="w-9 h-9 bg-slate-900 text-white text-xs font-bold flex items-center justify-center">
@@ -258,7 +263,8 @@ const TopBar = ({ title }) => (
       </div>
     </div>
   </div>
-);
+  );
+};
 
 const Page = ({ title, children }) => (
   <div className="flex-1 min-w-0">

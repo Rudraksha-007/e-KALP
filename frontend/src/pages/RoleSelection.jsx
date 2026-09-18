@@ -51,6 +51,7 @@
 
 import { Link } from "react-router-dom";
 import RoleCard from "../components/RoleCard";
+import Logo from "../components/Logo";
 import { roles } from "../config/roles";
 import { ROLE_ICONS } from "../components/RoleIcons";
 
@@ -84,15 +85,9 @@ export default function RoleSelection() {
         <header className="flex items-center justify-between border-b border-black/10 pb-5">
 
           <div className="flex items-center gap-4">
-            <div className="flex h-8 w-8 items-center justify-center border border-black">
-              <span className="text-[10px] font-black">eK</span>
-            </div>
+            <Logo height={28} tile />
 
             <div className="flex items-center gap-3">
-              <span className="text-lg font-black tracking-tight">
-                e-KALP
-              </span>
-
               <span className="hidden h-4 w-px bg-black/20 sm:block" />
 
               <span className="hidden font-mono text-[10px] uppercase tracking-[0.3em] text-black/50 sm:block">

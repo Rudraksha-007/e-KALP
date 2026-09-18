@@ -2422,18 +2422,85 @@ import {
   ArrowLeft, MapPin, Camera, Upload, Search, Bell, ChevronRight, ChevronDown,
   ThumbsUp, MessageSquare, FlaskConical, Building2, Landmark, Download,
   Plus, Radio, Award, CheckCircle2, Users, Tractor, Zap, GraduationCap,
-  Droplet, Shield, ExternalLink, Lock, Mail, Phone, Languages, Navigation,
+  Droplet, Shield, ExternalLink, Lock, Phone, Navigation,
   ThumbsUp as VoiceIcon, Bookmark, Share2, Clock, TrendingUp, Target, Flag,
-  LayoutGrid
+  LayoutGrid, LogOut
 } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { authApi, citizenApi, problemApi } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
+import Logo from "../../components/Logo";
 
 /*
   Requires: npm install leaflet
   OpenStreetMap tiles are free and require no API key — just attribution,
   which is included in the tile layer below.
 */
+
+// Generic default avatar shown when a user has no photo.
+const DEFAULT_AVATAR =
+  "data:image/svg+xml," +
+  encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#EDE9E5"/>
+  <circle cx="50" cy="38" r="20" fill="#F5720B"/>
+  <path d="M20 88c4-18 16-27 30-27s26 9 30 27" fill="#F5720B"/>
+</svg>`);
+
+// Thematic domains — aligned with the backend category set.
+const CITIZEN_CATEGORIES = [
+  { value: "EDUCATION", label: "Education" },
+  { value: "HEALTHCARE", label: "Healthcare" },
+  { value: "AGRICULTURE", label: "Agriculture" },
+  { value: "WATER_MANAGEMENT", label: "Water management" },
+  { value: "SANITATION", label: "Sanitation" },
+  { value: "ENVIRONMENT", label: "Environment" },
+  { value: "RURAL_LIVELIHOODS", label: "Rural livelihoods" },
+  { value: "ACCESSIBILITY", label: "Accessibility" },
+  { value: "URBAN_INFRASTRUCTURE", label: "Urban infrastructure" },
+  { value: "PUBLIC_SERVICE_DELIVERY", label: "Public service delivery" },
+];
+
+// Haversine distance between two lat/lng points, in km.
+function haversineKm(aLat, aLng, bLat, bLng) {
+  const R = 6371;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) *
+      Math.cos(toRad(bLat)) *
+      Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+// Sort problems by distance from the citizen and keep the nearest `count`.
+function nearestProblems(problems, lat, lng, count) {
+  return [...problems]
+    .map((p) => {
+      const pLat = Number(p.latitude);
+      const pLng = Number(p.longitude);
+      const distanceKm =
+        Number.isFinite(pLat) && Number.isFinite(pLng)
+          ? haversineKm(Number(lat), Number(lng), pLat, pLng)
+          : Infinity;
+      return { ...p, distanceKm };
+    })
+    .sort((a, b) => a.distanceKm - b.distanceKm)
+    .slice(0, count ?? problems.length);
+}
+
+// Read a File as a base64 data string (for the photos/videos arrays).
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 // Marker icon fix: Leaflet's default marker assets don't resolve under
 // most bundlers (Vite/CRA), so we build a lightweight custom pin instead
@@ -2453,17 +2520,6 @@ const buildPin = (color = "#F5720B", label) =>
 /* ------------------------------------------------------------------ */
 /* Shared chrome                                                       */
 /* ------------------------------------------------------------------ */
-
-const Logo = ({ size = 36 }) => (
-  <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="40" height="40" fill="#0B0B0C" />
-    <rect x="6" y="6" width="10" height="10" fill="#F5720B" />
-    <rect x="18" y="6" width="10" height="10" fill="#F5F4F0" fillOpacity="0.15" />
-    <rect x="6" y="18" width="10" height="10" fill="#F5F4F0" fillOpacity="0.15" />
-    <rect x="18" y="18" width="10" height="10" fill="#F5F4F0" />
-    <rect x="24" y="24" width="10" height="10" fill="#F5720B" />
-  </svg>
-);
 
 /* ------------------------------------------------------------------ */
 /* OpenStreetMap view (Leaflet)                                        */
@@ -2497,6 +2553,7 @@ const MapView = ({
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const pinRef = useRef(null);
+  const markerLayerRef = useRef(null);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -2514,6 +2571,8 @@ const MapView = ({
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
+    markerLayerRef.current = L.layerGroup().addTo(map);
+
     if (pinMode) {
       const pin = L.marker([center.lat, center.lng], {
         icon: buildPin("#F5720B"),
@@ -2528,22 +2587,32 @@ const MapView = ({
         onPick && onPick(e.latlng);
       });
       pinRef.current = pin;
-    } else {
-      markers.forEach((m) => {
-        const marker = L.marker([m.lat, m.lng], { icon: buildPin("#F5720B", m.n) }).addTo(map);
-        marker.bindPopup(
-          `<div style="font:700 12px monospace;color:#0B0B0C;">${m.label}</div><div style="font:11px monospace;color:#F5720B;">${m.id}</div>`
-        );
-        if (onMarkerClick) marker.on("click", () => onMarkerClick(m));
-      });
     }
 
     return () => {
       map.remove();
       mapRef.current = null;
+      markerLayerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-render markers whenever the `markers` prop changes (live backend data).
+  useEffect(() => {
+    const layer = markerLayerRef.current;
+    if (!layer || pinMode) return;
+
+    layer.clearLayers();
+    markers.forEach((m) => {
+      if (typeof m.lat !== "number" || typeof m.lng !== "number") return;
+      const marker = L.marker([m.lat, m.lng], { icon: buildPin("#F5720B", m.n) }).addTo(layer);
+      marker.bindPopup(
+        `<div style="font:700 12px monospace;color:#0B0B0C;">${m.label ?? ""}</div><div style="font:11px monospace;color:#F5720B;">${m.id ?? ""}</div>`
+      );
+      if (onMarkerClick) marker.on("click", () => onMarkerClick(m));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [markers, pinMode]);
 
   return (
     <div
@@ -2553,7 +2622,8 @@ const MapView = ({
   );
 };
 
-const Sidebar = ({ active, go, brand = "e-KALP" }) => {
+const Sidebar = ({ active, go, profile }) => {
+  const { logout } = useAuth();
   const links = [
     { key: "dashboard", label: "Dashboard", icon: LayoutGrid },
     { key: "explore", label: "Discover Projects", icon: Search },
@@ -2562,15 +2632,18 @@ const Sidebar = ({ active, go, brand = "e-KALP" }) => {
     { key: "profile", label: "Profile", icon: Users },
   ];
 
+  const userName = profile?.name || "Citizen";
+  const coords =
+    profile?.latitude != null && profile?.longitude != null
+      ? `${Number(profile.latitude).toFixed(3)}°N, ${Number(profile.longitude).toFixed(3)}°E`
+      : "Location unavailable";
+
   return (
     <aside className="w-64 shrink-0 bg-white border-r border-neutral-200 h-screen sticky top-0 flex flex-col overflow-hidden">
       {/* Brand */}
-      <div className="px-5 py-5 flex items-center gap-3 border-b border-neutral-200 shrink-0">
-        <Logo size={34} />
-        <div className="min-w-0">
-          <p className="font-black text-[16px] leading-tight text-neutral-950 tracking-tight truncate">{brand}</p>
-          <p className="text-[9px] font-mono font-semibold tracking-[0.15em] text-orange-600">CIVIC · INTELLIGENCE</p>
-        </div>
+      <div className="px-5 py-4 border-b border-neutral-200 shrink-0">
+        <Logo height={26} tile />
+        <p className="mt-2 text-[9px] font-mono font-semibold tracking-[0.15em] text-orange-600">CIVIC · INTELLIGENCE</p>
       </div>
 
       {/* Nav links */}
@@ -2596,7 +2669,7 @@ const Sidebar = ({ active, go, brand = "e-KALP" }) => {
         <button className="w-full flex items-center gap-2 bg-neutral-50 border border-neutral-200 px-3 py-2 text-xs text-neutral-600 hover:bg-neutral-100 transition-colors font-mono">
           <MapPin size={13} className="text-orange-600 shrink-0" />
           <span className="leading-tight text-left flex-1 truncate">
-            Namkum, Ranchi (Jharkhand)
+            {coords}
           </span>
           <span className="text-orange-600 font-semibold shrink-0">Change</span>
         </button>
@@ -2609,26 +2682,38 @@ const Sidebar = ({ active, go, brand = "e-KALP" }) => {
       </div>
 
       {/* Profile footer */}
-      <button
-        onClick={() => go("profile")}
-        className="flex items-center gap-3 px-5 py-4 border-t border-neutral-200 text-left hover:bg-neutral-50 transition-colors shrink-0"
-      >
-        <img
-          src="https://i.pravatar.cc/64?img=13"
-          className="w-9 h-9 object-cover shrink-0"
-          alt="Amit Verma"
-        />
-        <span className="flex-1 leading-tight min-w-0">
-          <span className="block text-[13px] font-semibold text-neutral-950 truncate">Amit Verma</span>
-          <span className="block text-[10px] font-mono text-orange-600 font-medium tracking-wide">ACTIVE CITIZEN</span>
-        </span>
-        <span className="relative text-neutral-400 shrink-0">
-          <Bell size={16} />
-          <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[8px] w-3.5 h-3.5 flex items-center justify-center font-bold">
-            3
+      <div className="flex items-stretch border-t border-neutral-200 shrink-0">
+        <button
+          onClick={() => go("profile")}
+          className="flex items-center gap-3 px-5 py-4 text-left hover:bg-neutral-50 transition-colors flex-1 min-w-0"
+        >
+          <img
+            src={DEFAULT_AVATAR}
+            className="w-9 h-9 object-cover shrink-0"
+            alt={userName}
+          />
+          <span className="flex-1 leading-tight min-w-0">
+            <span className="block text-[13px] font-semibold text-neutral-950 truncate">{userName}</span>
+            <span className="block text-[10px] font-mono text-orange-600 font-medium tracking-wide">
+              {(profile?.occupation || "ACTIVE CITIZEN").toUpperCase()}
+            </span>
           </span>
-        </span>
-      </button>
+          <span className="relative text-neutral-400 shrink-0">
+            <Bell size={16} />
+            <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[8px] w-3.5 h-3.5 flex items-center justify-center font-bold">
+              3
+            </span>
+          </span>
+        </button>
+        <button
+          onClick={logout}
+          title="Log out"
+          aria-label="Log out"
+          className="flex items-center justify-center px-4 text-neutral-400 hover:text-orange-600 hover:bg-neutral-50 border-l border-neutral-200 transition-colors"
+        >
+          <LogOut size={16} />
+        </button>
+      </div>
     </aside>
   );
 };
@@ -2833,129 +2918,233 @@ const PROBLEMS = [
 /* 1. Report a Problem                                                  */
 /* ------------------------------------------------------------------ */
 
-const ReportProblem = ({ go }) => (
-  <div className="min-h-screen bg-neutral-50 flex">
-    <Sidebar active="report" go={go} brand="e-KALP" />
-    <div className="flex-1 min-w-0 flex flex-col">
-      <div className="border-b border-neutral-200 bg-white">
-        <div className="max-w-[1040px] mx-auto px-6 py-4 flex items-center justify-between">
-          <button onClick={() => go("dashboard")} className="flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-950 font-medium">
-            <ArrowLeft size={16} /> Cancel Submission
-          </button>
-          <div className="w-32" />
+const ReportProblem = ({ go, profile, onSubmitted }) => {
+  const defaultLocation =
+    profile?.latitude != null && profile?.longitude != null
+      ? { lat: profile.latitude, lng: profile.longitude }
+      : RANCHI_CENTER;
+
+  const [title, setTitle] = useState("");
+  const [pd, setPd] = useState("");
+  const [categories, setCategories] = useState([]);
+  const [photos, setPhotos] = useState([]);
+  const [videos, setVideos] = useState([]);
+  const [pin, setPin] = useState(defaultLocation);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  function toggleCategory(value) {
+    setCategories((prev) =>
+      prev.includes(value) ? prev.filter((c) => c !== value) : [...prev, value]
+    );
+  }
+
+  async function handleFiles(e, setter) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const encoded = await Promise.all(files.map(fileToBase64));
+    setter(encoded);
+  }
+
+  async function handleSubmit() {
+    setError("");
+    if (!title.trim() || !pd.trim()) {
+      setError("Please provide a title and a description of the problem.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // POST /citizen/reportProblem — matches the backend ProblemCreate schema.
+      const { data } = await citizenApi.reportProblem({
+        title: title.trim(),
+        pd: pd.trim(),
+        photos,
+        videos,
+        longitude: pin.lng,
+        latitude: pin.lat,
+        categories,
+      });
+      onSubmitted && onSubmitted(data);
+      go("myreports");
+    } catch (err) {
+      setError(
+        err.response?.data?.detail?.map?.((d) => d.msg).join(", ") ||
+          err.response?.data?.detail ||
+          err.message ||
+          "Could not submit the problem. Please try again."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-neutral-50 flex">
+      <Sidebar active="report" go={go} brand="e-KALP" profile={profile} />
+      <div className="flex-1 min-w-0 flex flex-col">
+        <div className="border-b border-neutral-200 bg-white">
+          <div className="max-w-[1040px] mx-auto px-6 py-4 flex items-center justify-between">
+            <button onClick={() => go("dashboard")} className="flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-950 font-medium">
+              <ArrowLeft size={16} /> Cancel Submission
+            </button>
+            <div className="w-32" />
+          </div>
         </div>
-      </div>
 
-      <div className="flex-1 max-w-[1040px] w-full mx-auto px-6 py-10">
-        <p className="text-[10px] font-mono font-bold tracking-[0.15em] text-orange-600 mb-2 flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 bg-orange-500" /> NEW SUBMISSION
-        </p>
-        <h2 className="text-4xl font-black text-neutral-950 tracking-tight">Report a Challenge</h2>
-        <p className="mt-2 text-neutral-500 max-w-xl">
-          Provide details about the local issue to help authorities and innovators understand and
-          address it effectively.
-        </p>
-
-        <section className="mt-8 bg-white border border-neutral-200 p-6">
-          <div className="flex items-center gap-3 pb-4 border-b border-neutral-200">
-            <span className="w-7 h-7 bg-orange-500 text-white flex items-center justify-center">
-              <MapPin size={15} />
-            </span>
-            <h3 className="text-xs font-mono font-bold tracking-[0.1em] text-orange-600">1. PINPOINT THE LOCATION</h3>
-          </div>
-          <div className="mt-5 overflow-hidden border border-neutral-200 relative">
-            <div className="absolute top-4 left-4 right-4 z-[400] bg-white border border-neutral-200 flex items-center gap-2 px-4 py-3">
-              <Search size={16} className="text-neutral-400" />
-              <input
-                className="flex-1 outline-none text-sm text-neutral-700"
-                defaultValue="Main Road, Ranchi"
-              />
-              <Navigation size={16} className="text-orange-600" />
-            </div>
-            <MapView
-              pinMode
-              center={RANCHI_CENTER}
-              zoom={14}
-              heightClass="h-64"
-              onPick={(latlng) => console.log("Pinned location:", latlng)}
-            />
-          </div>
-          <p className="mt-2 text-[10px] font-mono text-neutral-400">
-            Click the map or drag the pin to set the exact problem location.
+        <div className="flex-1 max-w-[1040px] w-full mx-auto px-6 py-10">
+          <p className="text-[10px] font-mono font-bold tracking-[0.15em] text-orange-600 mb-2 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 bg-orange-500" /> NEW SUBMISSION
           </p>
-        </section>
+          <h2 className="text-4xl font-black text-neutral-950 tracking-tight">Report a Challenge</h2>
+          <p className="mt-2 text-neutral-500 max-w-xl">
+            Provide details about the local issue to help authorities and innovators understand and
+            address it effectively.
+          </p>
 
-        <section className="mt-6 bg-white border border-neutral-200 p-6">
-          <div className="flex items-center gap-3 pb-4 border-b border-neutral-200">
-            <span className="w-7 h-7 bg-orange-500 text-white flex items-center justify-center">
-              <MessageSquare size={15} />
-            </span>
-            <h3 className="text-xs font-mono font-bold tracking-[0.1em] text-orange-600">2. CHALLENGE DETAILS</h3>
-          </div>
+          {error && (
+            <div className="mt-5 bg-red-50 border border-red-200 text-red-600 text-xs font-mono px-4 py-3">
+              {error}
+            </div>
+          )}
 
-          <div className="mt-5 space-y-6">
-            <div>
-              <p className="font-semibold text-neutral-950 text-sm">What is the problem?</p>
-              <p className="text-xs text-neutral-500 mt-0.5">Describe the issue clearly. Be specific about what is happening.</p>
-              <textarea
-                rows={3}
-                placeholder="E.g., The public water dispenser at the main square has been broken for 3 weeks..."
-                className="mt-2 w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-600 placeholder-neutral-400 outline-none focus:ring-2 focus:ring-orange-200"
+          <section className="mt-8 bg-white border border-neutral-200 p-6">
+            <div className="flex items-center gap-3 pb-4 border-b border-neutral-200">
+              <span className="w-7 h-7 bg-orange-500 text-white flex items-center justify-center">
+                <MapPin size={15} />
+              </span>
+              <h3 className="text-xs font-mono font-bold tracking-[0.1em] text-orange-600">1. PINPOINT THE LOCATION</h3>
+            </div>
+            <div className="mt-5 overflow-hidden border border-neutral-200 relative">
+              <MapView
+                pinMode
+                center={defaultLocation}
+                zoom={14}
+                heightClass="h-64"
+                onPick={(latlng) => setPin(latlng)}
               />
             </div>
-            <div>
-              <p className="font-semibold text-neutral-950 text-sm">Who is affected?</p>
-              <p className="text-xs text-neutral-500 mt-0.5">Identify the community, demographics, or groups impacted by this.</p>
-              <textarea
-                rows={2}
-                placeholder="E.g., Daily commuters, local street vendors, and elderly residents..."
-                className="mt-2 w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-600 placeholder-neutral-400 outline-none focus:ring-2 focus:ring-orange-200"
-              />
-            </div>
-            <div>
-              <p className="font-semibold text-neutral-950 text-sm">Desired Outcome</p>
-              <p className="text-xs text-neutral-500 mt-0.5">What does a successful resolution look like to you?</p>
-              <textarea
-                rows={3}
-                placeholder="E.g., Repair the dispenser or replace it with a modern purification unit..."
-                className="mt-2 w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-600 placeholder-neutral-400 outline-none focus:ring-2 focus:ring-orange-200"
-              />
-            </div>
-          </div>
-        </section>
+            <p className="mt-2 text-[10px] font-mono text-neutral-400">
+              Click the map or drag the pin to set the exact problem location.{" "}
+              <span className="text-orange-600">
+                PINNED: {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}
+              </span>
+            </p>
+          </section>
 
-        <section className="mt-6 bg-white border border-neutral-200 p-6">
-          <div className="flex items-center gap-3 pb-4 border-b border-neutral-200">
-            <span className="w-7 h-7 bg-orange-500 text-white flex items-center justify-center">
-              <Camera size={15} />
-            </span>
-            <h3 className="text-xs font-mono font-bold tracking-[0.1em] text-orange-600">3. SUPPORTING MEDIA (OPTIONAL)</h3>
-          </div>
-          <div className="mt-5 border-2 border-dashed border-neutral-200 py-12 flex flex-col items-center gap-3">
-            <span className="w-10 h-10 bg-sky-50 flex items-center justify-center">
-              <Upload size={18} className="text-sky-600" />
-            </span>
-            <p className="text-sm font-semibold text-neutral-800">Click to upload or drag and drop</p>
-            <p className="text-xs text-neutral-400">SVG, PNG, JPG or MP4 (max. 10MB)</p>
-          </div>
-        </section>
+          <section className="mt-6 bg-white border border-neutral-200 p-6">
+            <div className="flex items-center gap-3 pb-4 border-b border-neutral-200">
+              <span className="w-7 h-7 bg-orange-500 text-white flex items-center justify-center">
+                <MessageSquare size={15} />
+              </span>
+              <h3 className="text-xs font-mono font-bold tracking-[0.1em] text-orange-600">2. CHALLENGE DETAILS</h3>
+            </div>
 
-        <div className="mt-8 flex justify-end gap-3">
-          <button className="px-5 py-2.5 text-sm font-semibold text-neutral-600 hover:bg-neutral-100">
-            Save as Draft
-          </button>
-          <button
-            onClick={() => go("myreports")}
-            className="px-5 py-2.5 text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white flex items-center gap-1.5"
-          >
-            Submit Challenge <ChevronRight size={16} />
-          </button>
+            <div className="mt-5 space-y-6">
+              <div>
+                <p className="font-semibold text-neutral-950 text-sm">What is the problem?</p>
+                <p className="text-xs text-neutral-500 mt-0.5">Give the issue a short, clear title.</p>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={500}
+                  placeholder="E.g., Broken public water dispenser at the main square"
+                  className="mt-2 w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-700 placeholder-neutral-400 outline-none focus:ring-2 focus:ring-orange-200"
+                />
+              </div>
+              <div>
+                <p className="font-semibold text-neutral-950 text-sm">Describe the issue</p>
+                <p className="text-xs text-neutral-500 mt-0.5">Be specific about what is happening and who is affected.</p>
+                <textarea
+                  rows={5}
+                  value={pd}
+                  onChange={(e) => setPd(e.target.value)}
+                  placeholder="E.g., The public water dispenser at the main square has been broken for 3 weeks. Around 200 households depend on it..."
+                  className="mt-2 w-full border border-neutral-200 px-4 py-3 text-sm text-neutral-700 placeholder-neutral-400 outline-none focus:ring-2 focus:ring-orange-200"
+                />
+              </div>
+              <div>
+                <p className="font-semibold text-neutral-950 text-sm">Thematic domain(s)</p>
+                <p className="text-xs text-neutral-500 mt-0.5">Select all that apply — used by the AI to route your report.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {CITIZEN_CATEGORIES.map((cat) => {
+                    const selected = categories.includes(cat.value);
+                    return (
+                      <button
+                        key={cat.value}
+                        type="button"
+                        onClick={() => toggleCategory(cat.value)}
+                        className={`px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                          selected
+                            ? "border-orange-500 bg-orange-500 text-white"
+                            : "border-neutral-200 bg-white text-neutral-600 hover:border-orange-300"
+                        }`}
+                      >
+                        {selected ? "✓ " : "+ "}{cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-6 bg-white border border-neutral-200 p-6">
+            <div className="flex items-center gap-3 pb-4 border-b border-neutral-200">
+              <span className="w-7 h-7 bg-orange-500 text-white flex items-center justify-center">
+                <Camera size={15} />
+              </span>
+              <h3 className="text-xs font-mono font-bold tracking-[0.1em] text-orange-600">3. SUPPORTING MEDIA (OPTIONAL)</h3>
+            </div>
+            <div className="mt-5 grid sm:grid-cols-2 gap-4">
+              <label className="border-2 border-dashed border-neutral-200 py-8 flex flex-col items-center gap-2 cursor-pointer hover:border-orange-300">
+                <Upload size={18} className="text-sky-600" />
+                <span className="text-sm font-semibold text-neutral-800">Upload photos</span>
+                <span className="text-xs text-neutral-400">
+                  {photos.length > 0 ? `${photos.length} photo(s) attached` : "PNG, JPG"}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFiles(e, setPhotos)}
+                />
+              </label>
+              <label className="border-2 border-dashed border-neutral-200 py-8 flex flex-col items-center gap-2 cursor-pointer hover:border-orange-300">
+                <Upload size={18} className="text-sky-600" />
+                <span className="text-sm font-semibold text-neutral-800">Upload videos</span>
+                <span className="text-xs text-neutral-400">
+                  {videos.length > 0 ? `${videos.length} video(s) attached` : "MP4"}
+                </span>
+                <input
+                  type="file"
+                  accept="video/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFiles(e, setVideos)}
+                />
+              </label>
+            </div>
+          </section>
+
+          <div className="mt-8 flex justify-end gap-3">
+            <button onClick={() => go("dashboard")} className="px-5 py-2.5 text-sm font-semibold text-neutral-600 hover:bg-neutral-100">
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="px-5 py-2.5 text-sm font-bold bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white flex items-center gap-1.5"
+            >
+              {submitting ? "Submitting…" : "Submit Challenge"} <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
+        <Footer />
       </div>
-      <Footer />
     </div>
-  </div>
-);
+  );
+};
 
 /* ------------------------------------------------------------------ */
 /* 2. Dashboard                                                         */
@@ -2963,53 +3152,111 @@ const ReportProblem = ({ go }) => (
 
 // const Dashboard = ({ go, openProblem }) => {
 //   const [filter, setFilter] = useState("All");
-const Dashboard = ({ go, openProblem }) => {
+const CATEGORY_ICONS = {
+  WATER_MANAGEMENT: Droplet,
+  AGRICULTURE: Tractor,
+  HEALTHCARE: Shield,
+  URBAN_INFRASTRUCTURE: Zap,
+  EDUCATION: GraduationCap,
+};
+
+const Dashboard = ({ go, profile }) => {
   const [filter, setFilter] = useState("All");
   const [liveProblems, setLiveProblems] = useState([]);
   const [liveLoading, setLiveLoading] = useState(true);
   const [liveError, setLiveError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // The citizen's own coordinates drive the map + proximity ordering.
+  const userLocation =
+    profile?.latitude != null && profile?.longitude != null
+      ? { lat: profile.latitude, lng: profile.longitude }
+      : RANCHI_CENTER;
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/problems")
+    setLiveLoading(true);
+    // Auth token is injected automatically by the api.js axios interceptor.
+    problemApi
+      .list({ limit: 50, offset: 0 })
       .then((res) => {
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
-        setLiveProblems(data.items || []);
+        setLiveProblems(res.data.items || []);
         setLiveLoading(false);
       })
       .catch((err) => {
         setLiveError(err.message);
         setLiveLoading(false);
       });
-  }, []);
+  }, [refreshKey]);
+
+  // Nearest-first ordering relative to the citizen.
+  const sortedProblems = nearestProblems(
+    liveProblems,
+    userLocation.lat,
+    userLocation.lng
+  );
+
+  const counts = liveProblems.reduce((acc, p) => {
+    (p.categories || []).forEach((c) => {
+      acc[c] = (acc[c] || 0) + 1;
+    });
+    return acc;
+  }, {});
+
   const cats = [
-    { label: "All", count: 34 },
-    { label: "Water", count: 8, icon: Droplet },
-    { label: "Agriculture", count: 7, icon: Tractor },
-    { label: "Healthcare", count: 5, icon: Shield },
-    { label: "Infrastructure", count: 6, icon: Zap },
-    { label: "Education", count: 8, icon: GraduationCap },
+    { value: null, label: "All", count: liveProblems.length },
+    ...CITIZEN_CATEGORIES.map((c) => ({
+      value: c.value,
+      label: c.label,
+      count: counts[c.value] || 0,
+      icon: CATEGORY_ICONS[c.value],
+    })),
   ];
+
+  const visibleProblems =
+    filter === "All"
+      ? sortedProblems
+      : sortedProblems.filter((p) => (p.categories || []).includes(filter));
+
+  // Map markers: the citizen's own position plus the nearest reported problems.
+  const mapMarkers = [
+    { lat: userLocation.lat, lng: userLocation.lng, n: "★", label: "Your location", id: profile?.name || "You" },
+    ...sortedProblems
+      .map((p) => ({ ...p, lat: Number(p.latitude), lng: Number(p.longitude) }))
+      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+      .slice(0, 10)
+      .map((p, i) => ({
+        lat: p.lat,
+        lng: p.lng,
+        n: i + 1,
+        label: p.title,
+        id: `#${p.token_number}`,
+      })),
+  ];
+
+  const userName = profile?.name || "Citizen";
 
   return (
     <div className="min-h-screen bg-neutral-50 flex">
-      <Sidebar active="dashboard" go={go} brand="e-KALP" />
+      <Sidebar active="dashboard" go={go} brand="e-KALP" profile={profile} />
 
       <div className="flex-1 min-w-0">
         <div className="max-w-[1290px] mx-auto px-6 py-8">
           <div className="flex items-center gap-2 text-[10px] font-mono font-bold tracking-[0.15em] text-orange-600 mb-3">
-            <span className="w-1.5 h-1.5 bg-orange-500" /> NAMKUM CIVIC INNOVATION HUB · RANCHI CENTRAL
-            <span className="text-neutral-400 ml-1">ID: JH-RAN-NK-014</span>
+            <span className="w-1.5 h-1.5 bg-orange-500" /> CITIZEN CIVIC INNOVATION HUB
+            <span className="text-neutral-400 ml-1">
+              ID: {(profile?.id || "").slice(0, 8).toUpperCase() || "—"}
+            </span>
           </div>
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-4xl font-black text-neutral-950 tracking-tight">
-                Welcome back, <span className="text-orange-500">Amit Verma</span>
+                Welcome back, <span className="text-orange-500">{userName}</span>
               </h1>
               <p className="mt-1.5 text-sm text-neutral-500 flex items-center gap-1.5">
-                <Shield size={14} className="text-orange-500" /> Citizen Contributor · Ward 14, Namkum, Ranchi District · Impact Level: Regional Pioneer (Tier 3)
+                <Shield size={14} className="text-orange-500" />
+                {(profile?.occupation || "citizen").replace(/_/g, " ")} ·{" "}
+                {userLocation.lat.toFixed(3)}°N, {userLocation.lng.toFixed(3)}°E ·{" "}
+                Age {profile?.age ?? "—"}
               </p>
             </div>
             <button onClick={() => go("report")} className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold px-5 py-3">
@@ -3023,28 +3270,29 @@ const Dashboard = ({ go, openProblem }) => {
               <div className="bg-white border border-neutral-200 p-5">
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   <div>
-                    <p className="font-bold text-neutral-950 flex items-center gap-2"><MapPin size={16} className="text-orange-500"/> Namkum & Ranchi Micro-Geography Hotspots</p>
-                    <p className="text-xs text-neutral-400 mt-0.5 font-mono">Verified physical problem telemetry across ward boundaries</p>
+                    <p className="font-bold text-neutral-950 flex items-center gap-2"><MapPin size={16} className="text-orange-500"/> Problems Near You</p>
+                    <p className="text-xs text-neutral-400 mt-0.5 font-mono">Centered on your location · nearest reports shown first</p>
                   </div>
-                  <div className="flex gap-2 text-xs font-mono font-medium">
-                    <span className="px-3 py-1.5 bg-neutral-50 text-neutral-500 border border-neutral-200">All Wards</span>
-                    <span className="px-3 py-1.5 bg-orange-500 text-white">Namkum Only</span>
-                    <span className="px-3 py-1.5 bg-neutral-50 text-neutral-500 border border-neutral-200">Radius 5km</span>
-                  </div>
+                  <button
+                    onClick={() => setRefreshKey((k) => k + 1)}
+                    className="text-xs font-mono font-medium px-3 py-1.5 bg-neutral-50 text-neutral-500 border border-neutral-200 hover:bg-neutral-100"
+                  >
+                    ⟳ Refresh
+                  </button>
                 </div>
                 <div className="mt-4 relative">
-                  <MapView markers={DUMMY_MAP_POINTS} center={RANCHI_CENTER} zoom={13} heightClass="h-72" />
+                  <MapView markers={mapMarkers} center={userLocation} zoom={12} heightClass="h-72" />
                   <span className="absolute bottom-2 left-2 bg-white/95 border border-neutral-200 text-[9px] font-mono text-neutral-500 px-2 py-1 z-[400]">
-                    OPENSTREETMAP · DUMMY HOTSPOT DATA
+                    OPENSTREETMAP · ★ = YOU · PIN # = REPORT
                   </span>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {cats.map((c) => (
                     <button
                       key={c.label}
-                      onClick={() => setFilter(c.label)}
+                      onClick={() => setFilter(c.value ?? "All")}
                       className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 ${
-                        filter === c.label ? "bg-neutral-950 text-white" : "bg-white border border-neutral-200 text-neutral-600"
+                        filter === (c.value ?? "All") ? "bg-neutral-950 text-white" : "bg-white border border-neutral-200 text-neutral-600"
                       }`}
                     >
                       {c.icon && <c.icon size={13} />} {c.label} ({c.count})
@@ -3053,54 +3301,12 @@ const Dashboard = ({ go, openProblem }) => {
                 </div>
               </div>
 
-              {/* Problem cards */}
-                            {/* Problem cards */}
-              <div className="mt-6 space-y-5">
-                {PROBLEMS.map((p) => (
-                  <div key={p.id} className="bg-white border border-neutral-200 p-6 hover:border-orange-300 transition-colors">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-[10px] font-mono font-bold px-2 py-1 ${p.tagColor}`}>{p.tag}</span>
-                        <span className="text-xs text-neutral-400 flex items-center gap-1 font-mono"><MapPin size={11}/> {p.location}</span>
-                      </div>
-                      <span className={`text-xs font-semibold px-2.5 py-1 flex items-center gap-1.5 ${p.severityColor}`}>
-                        <span className="w-1.5 h-1.5 bg-current" /> {p.severity}
-                      </span>
-                    </div>
-                    <button onClick={() => openProblem(p.id)} className="text-left mt-3 text-lg font-bold text-neutral-950 leading-snug hover:text-orange-600">
-                      {p.title}
-                    </button>
-                    <div className="mt-4">
-                      <div className="flex justify-between text-[10px] font-mono font-bold text-neutral-500 mb-1.5 tracking-wide">
-                        <span>SOLUTION PROGRESS TRACKER</span>
-                        <span className="text-orange-600">{p.stageLabel}</span>
-                      </div>
-                      <Progress stages={p.stages} currentIndex={p.stageIndex} />
-                    </div>
-                    <div className="mt-4 flex items-center justify-between flex-wrap gap-3">
-                      <div className="flex gap-6 text-sm">
-                        <span className="flex items-center gap-1.5 text-neutral-600"><Users size={15} className="text-neutral-400"/> <b>{p.metricValue}</b> {p.metricLabel}</span>
-                        <span className="flex items-center gap-1.5 text-neutral-600"><GraduationCap size={15} className="text-neutral-400"/> <b>{p.uniValue}</b> {p.uniLabel}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <button className="text-xs font-semibold px-3 py-2 bg-neutral-50 text-neutral-600 flex items-center gap-1.5 border border-neutral-200">
-                          <ThumbsUp size={13} /> Add My Voice
-                        </button>
-                        <button onClick={() => openProblem(p.id)} className="text-xs font-bold px-3 py-2 bg-orange-500 text-white flex items-center gap-1.5">
-                          View Solution &amp; Progress <ChevronRight size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Live problems from backend */}
-              <div className="mt-8">
+              {/* Live problems from backend, nearest first */}
+              <div className="mt-6">
                 <div className="flex items-center justify-between mb-3">
-                  {/* <p className="text-xs font-mono font-bold text-neutral-500 tracking-[0.1em]">
-                    LIVE REPORTS · FROM BACKEND
-                  </p> */}
+                  <p className="text-xs font-mono font-bold text-neutral-500 tracking-[0.1em]">
+                    REPORTS · SORTED BY DISTANCE FROM YOU
+                  </p>
                   {liveLoading && (
                     <span className="text-[10px] font-mono text-neutral-400">Loading…</span>
                   )}
@@ -3113,15 +3319,15 @@ const Dashboard = ({ go, openProblem }) => {
                 )}
 
                 <div className="space-y-5">
-                  {liveProblems.map((lp) => (
+                  {visibleProblems.map((lp) => (
                     <div key={lp.id} className="bg-white border border-neutral-200 p-6 hover:border-orange-300 transition-colors">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] font-mono font-bold px-2 py-1 bg-sky-50 text-sky-700">
-                            {lp.categories && lp.categories.length > 0 ? lp.categories.join(", ").toUpperCase() : "UNCATEGORIZED"}
+                            {lp.categories && lp.categories.length > 0 ? lp.categories.join(", ").replace(/_/g, " ").toUpperCase() : "UNCATEGORIZED"}
                           </span>
                           <span className="text-xs text-neutral-400 flex items-center gap-1 font-mono">
-                            <MapPin size={11}/> {lp.location || "Unknown location"}
+                            <MapPin size={11}/> {Number(lp.latitude).toFixed(4)}, {Number(lp.longitude).toFixed(4)}
                           </span>
                         </div>
                         <span className="text-xs font-semibold px-2.5 py-1 flex items-center gap-1.5 bg-neutral-100 text-neutral-600">
@@ -3132,16 +3338,19 @@ const Dashboard = ({ go, openProblem }) => {
                         {lp.title}
                       </p>
                       <p className="mt-2 text-sm text-neutral-500">{lp.pd}</p>
-                      <div className="mt-4 flex items-center justify-between flex-wrap gap-3">
+                      <div className="mt-4 flex items-center justify-between flex-wrap gap-3 border-t border-neutral-100 pt-3">
                         <span className="text-xs font-mono text-neutral-400">
                           Token #{lp.token_number} · Reported {new Date(lp.date_reported).toLocaleDateString()}
+                        </span>
+                        <span className="text-xs font-mono font-bold text-orange-600 flex items-center gap-1">
+                          <Navigation size={12} /> {Number.isFinite(lp.distanceKm) ? `${lp.distanceKm.toFixed(1)} km away` : "distance unknown"}
                         </span>
                       </div>
                     </div>
                   ))}
 
-                  {!liveLoading && !liveError && liveProblems.length === 0 && (
-                    <p className="text-sm text-neutral-400">No live reports yet.</p>
+                  {!liveLoading && !liveError && visibleProblems.length === 0 && (
+                    <p className="text-sm text-neutral-400">No reports in this category yet.</p>
                   )}
                 </div>
               </div>            
@@ -3211,25 +3420,84 @@ const Dashboard = ({ go, openProblem }) => {
 /* 3. My Reports                                                        */
 /* ------------------------------------------------------------------ */
 
-const MyReports = ({ go, openProblem }) => {
-  const [tab, setTab] = useState("All Activity (8)");
-  const tabs = ["All Activity (8)", "Reported by Me (2)", "My Voices & Supported (6)", "Successfully Deployed (1)"];
+const MyReports = ({ go, profile }) => {
+  const [problems, setProblems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [tab, setTab] = useState("All");
+  const [search, setSearch] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const userLocation =
+    profile?.latitude != null && profile?.longitude != null
+      ? { lat: profile.latitude, lng: profile.longitude }
+      : RANCHI_CENTER;
+
+  useEffect(() => {
+    setLoading(true);
+    // GET /citizen/myProblems — problems reported by the logged-in citizen.
+    citizenApi
+      .myProblems()
+      .then((res) => {
+        setProblems(res.data || []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [refreshKey]);
+
+  const OPEN_STATUSES = ["NO_BIDDERS", "ASSIGNED", "IN_PROGRESS"];
+  const withDistance = nearestProblems(problems, userLocation.lat, userLocation.lng);
+
+  const tabs = [
+    { key: "All", label: `All (${problems.length})` },
+    {
+      key: "Open",
+      label: `Open (${problems.filter((p) => OPEN_STATUSES.includes(p.status)).length})`,
+    },
+    {
+      key: "Resolved",
+      label: `Resolved (${problems.filter((p) => p.status === "RESOLVED").length})`,
+    },
+  ];
+
+  const visible = withDistance.filter((p) => {
+    const matchesTab =
+      tab === "All" ||
+      (tab === "Open" && OPEN_STATUSES.includes(p.status)) ||
+      (tab === "Resolved" && p.status === "RESOLVED");
+    const q = search.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      p.title.toLowerCase().includes(q) ||
+      String(p.token_number).includes(q);
+    return matchesTab && matchesSearch;
+  });
+
   return (
     <div className="min-h-screen bg-neutral-50 flex">
-      <Sidebar active="myreports" go={go} brand="e-KALP" />
+      <Sidebar active="myreports" go={go} brand="e-KALP" profile={profile} />
       <div className="flex-1 min-w-0">
         <div className="max-w-[1290px] mx-auto px-6 py-8">
           <div className="bg-white border border-neutral-200 p-6 flex items-start justify-between flex-wrap gap-4">
             <div>
-              <p className="text-[10px] font-mono font-bold text-orange-600 tracking-[0.1em]">CITIZEN REGISTRY · UID-JH-NAM-8421 · LIVE SYNC WITH RANCHI CIVIC CELL</p>
-              <h1 className="text-2xl font-black text-neutral-950 mt-1 tracking-tight">My Civic Innovation Hub & Tracked Problems</h1>
+              <p className="text-[10px] font-mono font-bold text-orange-600 tracking-[0.1em]">
+                CITIZEN REGISTRY · {profile?.name?.toUpperCase() || "—"} · LIVE SYNC
+              </p>
+              <h1 className="text-2xl font-black text-neutral-950 mt-1 tracking-tight">My Reported Problems</h1>
               <p className="text-sm text-neutral-500 mt-1 max-w-xl">
-                Monitor verified progress, university field pilots, and municipal milestones for issues you reported or supported in the Namkum & Greater Ranchi corridor.
+                Every problem you submit through e-KALP, with its live status and the university/industry
+                pipeline it enters.
               </p>
             </div>
             <div className="flex gap-2">
-              <button className="text-xs font-semibold px-4 py-2.5 bg-white border border-neutral-200 text-neutral-600 flex items-center gap-1.5">
-                <Download size={13} /> Civic Impact Certificate
+              <button
+                onClick={() => setRefreshKey((k) => k + 1)}
+                className="text-xs font-semibold px-4 py-2.5 bg-white border border-neutral-200 text-neutral-600 flex items-center gap-1.5 hover:bg-neutral-50"
+              >
+                ⟳ Refresh
               </button>
               <button onClick={() => go("report")} className="text-xs font-bold px-4 py-2.5 bg-orange-500 text-white flex items-center gap-1.5">
                 <Plus size={13} /> Report New Issue
@@ -3240,86 +3508,118 @@ const MyReports = ({ go, openProblem }) => {
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="bg-white border border-neutral-200 p-5">
               <p className="text-[10px] font-mono font-bold text-neutral-400 tracking-[0.1em]">REPORTED BY YOU</p>
-              <p className="text-3xl font-black text-neutral-950 mt-2">2 <span className="text-sm font-semibold text-orange-600">Active Cases</span></p>
-              <p className="text-xs text-neutral-400 mt-1">· 1 in Prototype · 1 in Lab Validation</p>
-              <div className="h-1 bg-neutral-100 mt-3"><div className="h-1 w-1/2 bg-orange-500" /></div>
+              <p className="text-3xl font-black text-neutral-950 mt-2">
+                {problems.length} <span className="text-sm font-semibold text-orange-600">Total</span>
+              </p>
+              <p className="text-xs text-neutral-400 mt-1">
+                {problems.filter((p) => OPEN_STATUSES.includes(p.status)).length} open ·{" "}
+                {problems.filter((p) => ["RESOLVED", "CLOSED"].includes(p.status)).length} closed
+              </p>
             </div>
             <div className="bg-white border border-neutral-200 p-5">
-              <p className="text-[10px] font-mono font-bold text-neutral-400 tracking-[0.1em]">VOICES & SUPPORTED</p>
-              <p className="text-3xl font-black text-neutral-950 mt-2">6 <span className="text-sm font-semibold text-neutral-500">Initiatives</span></p>
-              <p className="text-xs text-neutral-400 mt-1">Active civic momentum across Ranchi district wards</p>
-              <div className="flex gap-1 mt-3">
-                {["R","N","B"].map(x => <span key={x} className="w-6 h-6 bg-neutral-100 text-[10px] font-bold text-neutral-500 flex items-center justify-center">{x}</span>)}
-                <span className="text-[10px] text-neutral-400 self-center ml-1 font-mono">+3 Wards</span>
-              </div>
+              <p className="text-[10px] font-mono font-bold text-neutral-400 tracking-[0.1em]">IN PROGRESS</p>
+              <p className="text-3xl font-black text-neutral-950 mt-2">
+                {problems.filter((p) => p.status === "IN_PROGRESS").length}{" "}
+                <span className="text-sm font-semibold text-neutral-500">Cases</span>
+              </p>
+              <p className="text-xs text-neutral-400 mt-1">Assigned &amp; actively being worked on</p>
             </div>
             <div className="bg-white border border-neutral-200 p-5">
-              <p className="text-[10px] font-mono font-bold text-neutral-400 tracking-[0.1em]">UNIVERSITIES ENGAGED</p>
-              <p className="text-3xl font-black text-neutral-950 mt-2">4 <span className="text-sm font-semibold text-neutral-500">Lead Labs</span></p>
-              <p className="text-xs text-neutral-400 mt-1">BIT Mesra, NIT Jsr, RU, BAU Kanke</p>
-              <p className="text-[10px] text-neutral-400 mt-3 font-mono">9 Research Scholars Active</p>
+              <p className="text-[10px] font-mono font-bold text-neutral-400 tracking-[0.1em]">AWAITING ASSIGNMENT</p>
+              <p className="text-3xl font-black text-neutral-950 mt-2">
+                {problems.filter((p) => p.status === "NO_BIDDERS").length}{" "}
+                <span className="text-sm font-semibold text-neutral-500">Cases</span>
+              </p>
+              <p className="text-[10px] text-neutral-400 mt-3 font-mono">Routing to universities…</p>
             </div>
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
             {tabs.map((t) => (
-              <button key={t} onClick={() => setTab(t)} className={`text-xs font-semibold px-4 py-2.5 ${tab === t ? "bg-orange-500 text-white" : "bg-white border border-neutral-200 text-neutral-600"}`}>
-                {t}
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`text-xs font-semibold px-4 py-2.5 ${
+                  tab === t.key ? "bg-orange-500 text-white" : "bg-white border border-neutral-200 text-neutral-600"
+                }`}
+              >
+                {t.label}
               </button>
             ))}
             <div className="ml-auto flex items-center gap-2 bg-white border border-neutral-200 px-3 py-2">
               <Search size={13} className="text-neutral-400" />
-              <input placeholder="Search track ID or keywords..." className="text-xs outline-none w-48 text-neutral-600 font-mono" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search title or token..."
+                className="text-xs outline-none w-48 text-neutral-600 font-mono"
+              />
             </div>
           </div>
 
+          {error && (
+            <div className="mt-5 bg-red-50 border border-red-200 text-red-600 text-xs font-mono px-4 py-3">
+              Failed to load your problems: {error}
+            </div>
+          )}
+
           <div className="mt-5 space-y-5">
-            {PROBLEMS.map((p) => (
+            {visible.map((p) => (
               <div key={p.id} className="bg-white border border-neutral-200 p-6">
                 <div className="flex justify-between flex-wrap gap-3">
                   <div className="flex items-center gap-2 flex-wrap text-xs font-mono">
-                    <span className="font-bold text-orange-600">{p.trackId}</span>
-                    <span className={`font-bold px-2 py-1 ${p.tagColor}`}>{p.tag}</span>
-                    <span className="text-neutral-400">· Reported by You on Nov 12, 2024</span>
+                    <span className="font-bold text-orange-600">#{p.token_number}</span>
+                    <span className="font-bold px-2 py-1 bg-sky-50 text-sky-700">
+                      {(p.categories || []).length > 0
+                        ? p.categories.join(", ").replace(/_/g, " ").toUpperCase()
+                        : "UNCATEGORIZED"}
+                    </span>
+                    <span className="text-neutral-400">
+                      · Reported {new Date(p.date_reported).toLocaleDateString()}
+                    </span>
                   </div>
                   <span className="text-[10px] font-mono font-bold px-3 py-1 bg-orange-50 text-orange-600 flex items-center gap-1.5 tracking-wide">
-                    <span className="w-1.5 h-1.5 bg-orange-500" /> {p.stageLabel.toUpperCase()}
+                    <span className="w-1.5 h-1.5 bg-orange-500" /> {(p.status || "PENDING").replace(/_/g, " ")}
                   </span>
                 </div>
-                <div className="mt-4 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-                  <div>
-                    <button onClick={() => openProblem(p.id)} className="text-left text-xl font-bold text-neutral-950 hover:text-orange-600">{p.fullTitle}</button>
-                    <p className="text-sm text-neutral-500 mt-2">{p.desc}</p>
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {p.universities.map((u) => (
-                        <span key={u.name} className="text-xs px-2.5 py-1 bg-neutral-50 border border-neutral-200 text-neutral-600 flex items-center gap-1.5"><GraduationCap size={12}/> {u.name}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-[10px] font-mono font-bold text-neutral-500 mb-1.5 tracking-wide">
-                      <span>VALIDATION PROGRESS</span>
-                      <span className="text-orange-600">{Math.round(((p.stageIndex+1)/6)*100)}% COMPLETE</span>
-                    </div>
-                    <Progress stages={["Log","Review","Lab","Prototype","Pilot","Deploy"]} currentIndex={p.stageIndex} />
-                    <div className="mt-3 bg-neutral-50 border border-neutral-100 p-3">
-                      <p className="text-[9px] font-mono font-bold text-orange-600 tracking-wide">LATEST UPDATE · {p.updates[0].date}</p>
-                      <p className="text-xs text-neutral-600 mt-1">{p.updates[0].text}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4 pt-4 border-t border-neutral-200 flex justify-between flex-wrap gap-3">
-                  <div className="flex gap-4 text-xs text-neutral-500">
-                    <span className="flex items-center gap-1"><ThumbsUp size={13}/> {p.upvotes} Upvotes</span>
-                    <span className="flex items-center gap-1"><MessageSquare size={13}/> {p.notes} Community Notes</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="text-xs font-semibold px-3 py-1.5 bg-neutral-50 text-neutral-600 border border-neutral-200">Share Dossier</button>
-                    <button onClick={() => openProblem(p.id)} className="text-xs font-bold px-3 py-1.5 bg-orange-500 text-white">View Workspace ›</button>
+                <div className="mt-4">
+                  <p className="text-xl font-bold text-neutral-950">{p.title}</p>
+                  <p className="text-sm text-neutral-500 mt-2">{p.pd}</p>
+                  <div className="flex flex-wrap gap-4 mt-3 text-xs font-mono text-neutral-400">
+                    <span className="flex items-center gap-1">
+                      <MapPin size={12} />
+                      {Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude))
+                        ? `${Number(p.latitude).toFixed(4)}, ${Number(p.longitude).toFixed(4)}`
+                        : "location unavailable"}
+                    </span>
+                    <span className="flex items-center gap-1 text-orange-600 font-bold">
+                      <Navigation size={12} /> {Number.isFinite(p.distanceKm) ? `${p.distanceKm.toFixed(1)} km from you` : "distance unknown"}
+                    </span>
+                    {p.photos?.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Camera size={12} /> {p.photos.length} photo(s)
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
             ))}
+
+            {!loading && !error && visible.length === 0 && (
+              <div className="bg-white border border-neutral-200 p-10 text-center">
+                <p className="text-sm text-neutral-400">
+                  {problems.length === 0
+                    ? "You haven't reported any problems yet."
+                    : "No problems match this filter."}
+                </p>
+                <button
+                  onClick={() => go("report")}
+                  className="mt-4 text-xs font-bold px-4 py-2.5 bg-orange-500 text-white inline-flex items-center gap-1.5"
+                >
+                  <Plus size={13} /> Report a Problem
+                </button>
+              </div>
+            )}
           </div>
         </div>
         <Footer />
@@ -3332,138 +3632,139 @@ const MyReports = ({ go, openProblem }) => {
 /* 4. Profile                                                           */
 /* ------------------------------------------------------------------ */
 
-const Profile = ({ go }) => (
-  <div className="min-h-screen bg-neutral-50 flex">
-    <Sidebar active="profile" go={go} brand="e-KALP" />
-    <div className="flex-1 min-w-0">
-      <div className="max-w-[1290px] mx-auto px-6 py-8">
-        <p className="text-xs text-neutral-400 flex items-center gap-1 font-mono">Dashboard <ChevronRight size={12}/> Citizen Profile
-          <span className="ml-auto flex items-center gap-4 text-[10px] font-mono font-semibold">
-            <span className="text-orange-600 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-orange-500"/> PORTAL STATUS: ACTIVE CITIZEN</span>
-            <span className="text-neutral-400">UID: JHK-834010-04419</span>
-          </span>
-        </p>
+const Profile = ({ go, profile }) => {
+  const lat = profile?.latitude != null ? Number(profile.latitude) : null;
+  const lng = profile?.longitude != null ? Number(profile.longitude) : null;
+  const memberSince = profile?.created_at
+    ? new Date(profile.created_at).toLocaleDateString(undefined, {
+        month: "long",
+        year: "numeric",
+      })
+    : "—";
 
-        <div className="mt-4 bg-white border border-neutral-200 p-6 flex flex-wrap items-center gap-6 justify-between">
-          <div className="flex items-center gap-5">
-            <div className="relative">
-              <img src="https://i.pravatar.cc/120?img=13" className="w-20 h-20 object-cover" alt="" />
-              <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-orange-500 border-2 border-white flex items-center justify-center">
-                <Shield size={11} className="text-white" />
-              </span>
-            </div>
-            <div>
-              <p className="text-xl font-black text-neutral-950 flex items-center gap-2 tracking-tight">
-                Amit Verma
-                <span className="text-[10px] font-mono font-semibold px-2 py-1 bg-sky-50 text-sky-700 flex items-center gap-1">
-                  <CheckCircle2 size={11}/> AADHAAR / WARD 14 VERIFIED
+  return (
+    <div className="min-h-screen bg-neutral-50 flex">
+      <Sidebar active="profile" go={go} brand="e-KALP" profile={profile} />
+      <div className="flex-1 min-w-0">
+        <div className="max-w-[1290px] mx-auto px-6 py-8">
+          <p className="text-xs text-neutral-400 flex items-center gap-1 font-mono">Dashboard <ChevronRight size={12}/> Citizen Profile
+            <span className="ml-auto flex items-center gap-4 text-[10px] font-mono font-semibold">
+              <span className="text-orange-600 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-orange-500"/> PORTAL STATUS: ACTIVE CITIZEN</span>
+              <span className="text-neutral-400">UID: {(profile?.id || "—").slice(0, 13).toUpperCase()}</span>
+            </span>
+          </p>
+
+          <div className="mt-4 bg-white border border-neutral-200 p-6 flex flex-wrap items-center gap-6 justify-between">
+            <div className="flex items-center gap-5">
+              <div className="relative">
+                <img src={DEFAULT_AVATAR} className="w-20 h-20 object-cover" alt={profile?.name || "Citizen"} />
+                <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-orange-500 border-2 border-white flex items-center justify-center">
+                  <Shield size={11} className="text-white" />
                 </span>
-              </p>
-              <p className="text-sm text-neutral-500 mt-1">Community Citizen Contributor & Neighborhood Volunteer</p>
-              <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-3 font-mono">
-                <span>Member since August 2024</span> ·
-                <span>Namkum, Ranchi (Jharkhand)</span> ·
-                <span>ID: VERMA-RNC-14</span>
-              </p>
+              </div>
+              <div>
+                <p className="text-xl font-black text-neutral-950 flex items-center gap-2 tracking-tight">
+                  {profile?.name || "Citizen"}
+                  <span className="text-[10px] font-mono font-semibold px-2 py-1 bg-sky-50 text-sky-700 flex items-center gap-1">
+                    <CheckCircle2 size={11}/> {profile?.role === "citizen" ? "VERIFIED CITIZEN" : "CITIZEN"}
+                  </span>
+                </p>
+                <p className="text-sm text-neutral-500 mt-1 capitalize">
+                  {(profile?.occupation || "Citizen").replace(/_/g, " ")} · Community Contributor
+                </p>
+                <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-3 font-mono">
+                  <span>Member since {memberSince}</span> ·
+                  <span>
+                    {lat != null && lng != null
+                      ? `${lat.toFixed(3)}°N, ${lng.toFixed(3)}°E`
+                      : "Location unavailable"}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <div className="bg-orange-50 px-5 py-4 flex items-center gap-3">
+              <Award size={22} className="text-orange-600" />
+              <div>
+                <p className="text-2xl font-black text-neutral-950">
+                  {profile?.problems?.length ?? 0}{" "}
+                  <span className="text-sm text-orange-600 font-mono font-semibold">REPORTS</span>
+                </p>
+                <p className="text-xs text-neutral-400">Submitted through e-KALP</p>
+              </div>
             </div>
           </div>
-          <div className="bg-orange-50 px-5 py-4 flex items-center gap-3">
-            <Award size={22} className="text-orange-600" />
-            <div>
-              <p className="text-2xl font-black text-neutral-950">840 <span className="text-sm text-orange-600 font-mono font-semibold">CIVIC POINTS</span></p>
-              <p className="text-xs text-neutral-400">Top 5% Contributor in Ranchi East</p>
-            </div>
-          </div>
-        </div>
 
-        <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6">
-          <div className="space-y-6 max-w-[640px]">
-            <div className="bg-white border border-neutral-200 p-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-neutral-950 flex items-center gap-2"><Users size={15} className="text-neutral-400"/> Personal Information</p>
-                  <p className="text-xs text-neutral-400 mt-1">Verified identity details recognized by municipal coordinators</p>
-                </div>
-                <Lock size={14} className="text-neutral-300 mt-1" />
-              </div>
-              <div className="mt-5 space-y-4">
-                <div>
-                  <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-neutral-600">Full Legal Name</span><span className="text-neutral-400 font-mono text-[10px]">MATCHES GOVT ID</span></div>
-                  <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">Amit Verma <CheckCircle2 size={15} className="text-emerald-600"/></div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6">
+            <div className="space-y-6 max-w-[640px]">
+              <div className="bg-white border border-neutral-200 p-6">
+                <div className="flex justify-between items-start">
                   <div>
-                    <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-neutral-600">Email Address</span><span className="text-emerald-600 font-mono text-[10px] font-semibold">VERIFIED</span></div>
-                    <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700"><span className="truncate">amit.verma.ranchi@gmail.com</span><Mail size={14} className="text-neutral-400 shrink-0"/></div>
+                    <p className="font-bold text-neutral-950 flex items-center gap-2"><Users size={15} className="text-neutral-400"/> Personal Information</p>
+                    <p className="text-xs text-neutral-400 mt-1">Verified identity details recognized by municipal coordinators</p>
                   </div>
+                  <Lock size={14} className="text-neutral-300 mt-1" />
+                </div>
+                <div className="mt-5 space-y-4">
                   <div>
-                    <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-neutral-600">Phone Number</span><span className="text-neutral-400 font-mono text-[10px]">SMS ALERTS ON</span></div>
-                    <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">+91 94311 XXXXX <Phone size={14} className="text-neutral-400"/></div>
+                    <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-neutral-600">Full Legal Name</span><span className="text-neutral-400 font-mono text-[10px]">FROM ACCOUNT</span></div>
+                    <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">{profile?.name || "—"} <CheckCircle2 size={15} className="text-emerald-600"/></div>
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-neutral-600">Age</span><span className="text-neutral-400 font-mono text-[10px]">DECLARED</span></div>
+                      <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">{profile?.age ?? "—"}</div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-neutral-600">Gender</span><span className="text-neutral-400 font-mono text-[10px]">DECLARED</span></div>
+                      <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">
+                        {profile?.gender === "M" ? "Male" : profile?.gender === "F" ? "Female" : "—"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-neutral-600">Phone Number</span><span className="text-neutral-400 font-mono text-[10px]">LOGIN ID</span></div>
+                      <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">{profile?.phone || "—"} <Phone size={14} className="text-neutral-400"/></div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-neutral-600">Occupation</span><span className="text-neutral-400 font-mono text-[10px]">SELF-DECLARED</span></div>
+                      <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700 capitalize">{(profile?.occupation || "—").replace(/_/g, " ")}</div>
+                    </div>
+                  </div>
+                  {profile?.uni_token != null && (
+                    <div>
+                      <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-neutral-600">University Registration No.</span><span className="text-neutral-400 font-mono text-[10px]">STUDENT</span></div>
+                      <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">{profile.uni_token} <GraduationCap size={14} className="text-neutral-400"/></div>
+                    </div>
+                  )}
+                  <p className="text-xs text-neutral-400">Details are fetched live from <span className="font-mono">GET /user/citizen/me</span>.</p>
                 </div>
-                <div>
-                  <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-neutral-600">Preferred Civic Language</span><span className="text-neutral-400 font-mono text-[10px]">USED IN ALERTS</span></div>
-                  <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">English & हिन्दी (Bilingual) <Languages size={14} className="text-neutral-400"/></div>
-                </div>
-                <p className="text-xs text-neutral-400">Jharkhand State Multi-lingual Civic Inclusivity standard compliant.</p>
               </div>
-            </div>
 
-            <div className="bg-white border border-neutral-200 p-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-neutral-950 flex items-center gap-2"><Building2 size={15} className="text-neutral-400"/> Jharkhand Residential & Ward Details</p>
-                  <p className="text-xs text-neutral-400 mt-1">Local civic jurisdiction determines your regional vote weight & pilot trials</p>
+              <div className="bg-white border border-neutral-200 p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-bold text-neutral-950 flex items-center gap-2"><Building2 size={15} className="text-neutral-400"/> Residential Location on Record</p>
+                    <p className="text-xs text-neutral-400 mt-1">Captured at registration and used to surface nearby problems</p>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-2 py-1 bg-orange-50 text-orange-600">GEO-TAGGED</span>
                 </div>
-                <span className="text-[10px] font-mono font-bold px-2 py-1 bg-orange-50 text-orange-600">RMC ZONE 4</span>
-              </div>
-              <div className="mt-5 space-y-4">
-                <div>
-                  <p className="text-xs font-semibold text-neutral-600 mb-1">Address Line / Landmark</p>
-                  <div className="bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">Quarter 4B, Near Old Railway Colony Road</div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs font-semibold text-neutral-600 mb-1">Locality / Village</p>
-                    <div className="bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">Namkum Basti, Namkum</div>
+                <div className="mt-5 space-y-4">
+                  <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 px-3 py-2.5">
+                    <span className="text-xs text-neutral-500 flex items-center gap-1.5 font-mono">
+                      <Navigation size={13}/> {lat != null && lng != null ? `${lat.toFixed(5)}° N, ${lng.toFixed(5)}° E` : "No coordinates on record"}
+                    </span>
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold text-neutral-600 mb-1">Gram Panchayat / Municipal Ward</p>
-                    <div className="bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">Ward 14, Namkum Block</div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-xs font-semibold text-neutral-600 mb-1">District</p>
-                    <div className="bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">Ranchi</div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-neutral-600 mb-1">State</p>
-                    <div className="bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">Jharkhand</div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-neutral-600 mb-1">Pincode</p>
-                    <div className="bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-sm text-neutral-700">834010</div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between bg-neutral-50 border border-neutral-100 px-3 py-2.5">
-                  <span className="text-xs text-neutral-500 flex items-center gap-1.5 font-mono"><Navigation size={13}/> 23.3421° N, 85.3852° E (Namkum Sub-division)</span>
-                  <span className="text-xs font-bold text-orange-600">Re-pin on Map</span>
                 </div>
               </div>
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <button className="px-5 py-2.5 text-sm font-semibold text-neutral-600 hover:bg-neutral-100">Cancel Changes</button>
-              <button className="px-5 py-2.5 text-sm font-bold bg-orange-500 text-white">Save Profile Changes</button>
             </div>
           </div>
         </div>
+        <Footer />
       </div>
-      <Footer />
     </div>
-  </div>
-);
+  );
+};
 
 /* ------------------------------------------------------------------ */
 /* 5. Problem Detail — LeetCode-style problem statement page            */
@@ -3491,7 +3792,7 @@ const ProblemDetail = ({ id, go }) => {
               <ArrowLeft size={16} />
             </button>
             <span className="text-sm font-black text-neutral-950 flex items-center gap-1.5 tracking-tight">
-              <Logo size={18} /> e-KALP
+              <Logo height={22} tile />
             </span>
             <span className="text-neutral-300">/</span>
             <button className="text-sm text-neutral-500 hover:text-neutral-800 font-mono">Problem List</button>
@@ -3706,18 +4007,71 @@ const ProblemDetail = ({ id, go }) => {
 export default function App() {
   const [page, setPage] = useState("dashboard");
   const [activeProblem, setActiveProblem] = useState(PROBLEMS[0].id);
+  const [profile, setProfile] = useState(() => {
+    // Optimistically hydrate from the stored session for instant paint.
+    try {
+      const stored = JSON.parse(localStorage.getItem("user") || "null");
+      return stored?.type === "citizen" ? stored : null;
+    } catch {
+      return null;
+    }
+  });
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState(null);
+
+  // Dynamically pull the freshest citizen details from the backend on mount.
+  // The axios interceptor attaches the JWT; a 401 is handled globally.
+  useEffect(() => {
+    let active = true;
+    authApi
+      .me("citizen")
+      .then((res) => {
+        if (!active) return;
+        const data = res.data;
+        setProfile(data);
+        localStorage.setItem("user", JSON.stringify({ ...data, type: "citizen" }));
+      })
+      .catch((err) => {
+        if (!active) return;
+        setProfileError(err.response?.data?.detail || err.message);
+      })
+      .finally(() => active && setProfileLoading(false));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const go = (key, problemId) => {
     if (key === "problem" && problemId) setActiveProblem(problemId);
     setPage(key === "problem" ? "problem" : key);
     window.scrollTo(0, 0);
   };
-  const openProblem = (id) => go("problem", id);
 
-  if (page === "report") return <ReportProblem go={go} />;
-  if (page === "myreports") return <MyReports go={go} openProblem={openProblem} />;
-  if (page === "profile") return <Profile go={go} />;
+  if (profileLoading && !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="flex flex-col items-center gap-3">
+          <span className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-[10px] font-mono tracking-[0.15em] text-neutral-400">
+            LOADING CITIZEN PROFILE…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (profileError && !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <p className="text-sm text-red-600 font-mono">Could not load your profile: {profileError}</p>
+      </div>
+    );
+  }
+
+  if (page === "report") return <ReportProblem go={go} profile={profile} />;
+  if (page === "myreports") return <MyReports go={go} profile={profile} />;
+  if (page === "profile") return <Profile go={go} profile={profile} />;
   if (page === "problem") return <ProblemDetail id={activeProblem} go={go} />;
-  if (page === "explore") return <Dashboard go={go} openProblem={openProblem} />;
-  return <Dashboard go={go} openProblem={openProblem} />;
+  if (page === "explore") return <Dashboard go={go} profile={profile} />;
+  return <Dashboard go={go} profile={profile} />;
 }

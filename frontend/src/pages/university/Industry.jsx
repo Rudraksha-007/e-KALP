@@ -4,96 +4,12 @@ import Layout from "./Layout";
 
 /**
  * ------------------------------------------------------------------
- *  DUMMY DATA
- *  Shaped the way a real API response would look, so that swapping
- *  this out for a fetch('/api/industry-requests') call later only
- *  means replacing the useState initializer below — no JSX changes
- *  needed. Each request now also carries the detail fields the
- *  right-hand panel needs (projectTitle, supportOffered, description,
- *  linkedProblemStatement). In a real app you might lazy-load these
- *  per-request on selection instead of shipping them all up front —
- *  swap the `useState` below for a `useEffect` fetch keyed on
- *  `selectedId` when you get there.
+ *  INDUSTRY PARTNERSHIPS
+ *  The backend does not currently expose industry-partnership requests.
+ *  This page keeps the master–detail UI but renders an empty state
+ *  until that endpoint exists.
  * ------------------------------------------------------------------
  */
-const PARTNERSHIP_REQUESTS = [
-  {
-    id: "agribot",
-    company: "Agribot Solutions Pvt. Ltd.",
-    initials: "AS",
-    contactName: "Rajendra Mistry",
-    contactRole: "Chief Technology Officer",
-    offer: "Technical Mentorship + Seed Funding",
-    value: "₹4,50,000",
-    status: "Approved",
-    submittedOn: "2024-11-22",
-    projectTitle: "Edge AI for Precision Agriculture",
-    partnershipType: "Technical Mentorship + Seed Funding",
-    duration: "8 months",
-    supportOffered: "₹4,50,000 seed funding · 2 dedicated engineer mentors · Proprietary drone & sensor kit",
-    description:
-      "Agribot Solutions proposes co-developing AI-powered crop monitoring systems with student teams. They will provide proprietary drone hardware, IoT sensor kits, twice-weekly technical mentoring, and seed funding for prototype manufacturing and field deployment.",
-    linkedProblemStatement: { code: "AGR-2024-017", domain: "AgriTech" },
-    decisionNote: "Decision recorded. Partner has been notified.",
-  },
-  {
-    id: "medtech",
-    company: "MedTech Innovations Ltd.",
-    initials: "MI",
-    contactName: "Dr. Pradeep Joshi",
-    contactRole: "Head of R&D",
-    offer: "Research Collaboration + Equipment Grant",
-    value: "₹2,00,000",
-    status: "Pending",
-    submittedOn: "2024-11-20",
-    projectTitle: "Assistive Communication Hardware Research",
-    partnershipType: "Research Collaboration + Equipment Grant",
-    duration: "10 months",
-    supportOffered: "₹2,00,000 equipment grant · Lab access · Clinical validation support",
-    description:
-      "MedTech Innovations proposes a joint research collaboration to validate assistive-communication hardware prototypes. They will provide lab access, clinical trial coordination with partner hospitals, and equipment funding for sensor and enclosure prototyping.",
-    linkedProblemStatement: { code: "HLT-2024-032", domain: "HealthTech / Assistive Tech" },
-    decisionNote: null,
-  },
-  {
-    id: "jaltech",
-    company: "Jal Tech Corp",
-    initials: "JT",
-    contactName: "Snehal Kothari",
-    contactRole: "VP Engineering",
-    offer: "Pilot Deployment + Full Funding",
-    value: "₹6,00,000",
-    status: "Approved",
-    submittedOn: "2024-11-15",
-    projectTitle: "Municipal Smart Water Pilot",
-    partnershipType: "Pilot Deployment + Full Funding",
-    duration: "9 months",
-    supportOffered: "₹6,00,000 full funding · Field deployment across 3 wards · Dedicated site engineer",
-    description:
-      "Jal Tech Corp proposes fully funding a pilot deployment of the smart water distribution network across 3 municipal wards in Mumbai, providing field installation support, a dedicated site engineer, and ongoing maintenance data access for the student team.",
-    linkedProblemStatement: { code: "ENV-2024-008", domain: "Smart Cities / IoT" },
-    decisionNote: "Decision recorded. Partner has been notified.",
-  },
-  {
-    id: "cloudsync",
-    company: "CloudSync Infrastructure",
-    initials: "CI",
-    contactName: "Anita Bose",
-    contactRole: "Head of Partnerships",
-    offer: "Cloud Credits + Internship Pipeline",
-    value: "$5,000 credits",
-    status: "Pending",
-    submittedOn: "2024-11-10",
-    projectTitle: "Offline-First LMS Cloud Infrastructure",
-    partnershipType: "Cloud Credits + Internship Pipeline",
-    duration: "6 months",
-    supportOffered: "$5,000 cloud credits · Priority internship pipeline · DevOps mentoring",
-    description:
-      "CloudSync Infrastructure proposes supporting the offline-first LMS project with cloud hosting credits for the sync backend, DevOps mentoring for scaling to more schools, and a priority internship pipeline for graduating team members.",
-    linkedProblemStatement: { code: "EDU-2024-045", domain: "EdTech" },
-    decisionNote: null,
-  },
-];
 
 /** ------------------------------------------------------------------
  *  STATUS STYLE HELPERS
@@ -163,18 +79,28 @@ function RequestList({ requests, selectedId, onSelect, pendingCount, totalCount 
       <div className="px-1 pb-4">
         <h2 className="text-lg font-semibold text-neutral-900">Partnership Requests</h2>
         <p className="text-sm text-neutral-500 mt-1">
-          {pendingCount} pending · {totalCount} total
+          {requests.length === 0
+            ? "No requests yet"
+            : `${pendingCount} pending · ${totalCount} total`}
         </p>
       </div>
       <div className="border-t border-neutral-100">
-        {requests.map((request) => (
-          <PartnershipRequestRow
-            key={request.id}
-            request={request}
-            isSelected={request.id === selectedId}
-            onClick={() => onSelect(request.id)}
-          />
-        ))}
+        {requests.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-neutral-200 bg-white px-6 py-12 text-center">
+            <p className="text-sm text-neutral-500">
+              The industry partnership workflow is not available in this build yet.
+            </p>
+          </div>
+        ) : (
+          requests.map((request) => (
+            <PartnershipRequestRow
+              key={request.id}
+              request={request}
+              isSelected={request.id === selectedId}
+              onClick={() => onSelect(request.id)}
+            />
+          ))
+        )}
       </div>
     </div>
   );
@@ -291,22 +217,9 @@ function RequestDetail({ request, onClose, onApprove, onReject }) {
 
 /** ------------------------------------------------------------------
  *  MAIN INDUSTRY PARTNERSHIPS PAGE (master–detail layout)
- * ------------------------------------------------------------------
- *  To wire this up to a real backend:
- *    1. Replace `useState(PARTNERSHIP_REQUESTS)` with `useState([])`
- *       and fetch the list from '/api/industry-requests' in a
- *       `useEffect`.
- *    2. If detail fields (description, supportOffered, etc.) are
- *       expensive to fetch, load them lazily in a `useEffect` keyed
- *       on `selectedId` instead of shipping them with the list.
- *    3. Wire `handleApprove` / `handleReject` to POST/PATCH calls,
- *       then update the matching request's `status` in state (or
- *       refetch the list).
- *
- *  Mounted at "/industry" — see App.jsx.
  * ------------------------------------------------------------------ */
 export default function Industry() {
-  const [requests, setRequests] = useState(PARTNERSHIP_REQUESTS);
+  const [requests, setRequests] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
 
   const pendingCount = useMemo(

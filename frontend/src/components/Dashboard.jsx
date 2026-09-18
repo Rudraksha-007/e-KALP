@@ -1,4 +1,5 @@
 import { useAuth } from "../context/AuthContext";
+import Logo from "./Logo";
 
 /**
  * Common chrome (top bar with name + logout) for every role dashboard.
@@ -11,9 +12,12 @@ export default function DashboardLayout({ title, accent = "text-slate-900", chil
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div>
-            <p className={`text-xs font-semibold uppercase tracking-wide ${accent}`}>{title}</p>
-            <p className="text-sm text-slate-500">Welcome back, {user?.name ?? "there"}</p>
+          <div className="flex items-center gap-4">
+            <Logo height={26} tile />
+            <div>
+              <p className={`text-xs font-semibold uppercase tracking-wide ${accent}`}>{title}</p>
+              <p className="text-sm text-slate-500">Welcome back, {user?.name ?? "there"}</p>
+            </div>
           </div>
           <button
             onClick={logout}

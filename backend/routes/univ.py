@@ -12,6 +12,7 @@ from config import settings
 from database import get_db
 from models.model import (
     ProblemStatement,
+    ProblemStatus,
     SpocActiveProblem,
     SpocUniversity,
     TeamLead,
@@ -164,6 +165,10 @@ async def pitch(
         pitch_row = existing
         action = "updated"
 
+    problem.assigned_to = team_lead.id
+    if problem.status == ProblemStatus.NO_BIDDERS:
+        problem.status = ProblemStatus.ASSIGNED
+
     await db.commit()
     await db.refresh(pitch_row)
 
@@ -202,6 +207,34 @@ async def evaluate(
     )
     rows = result.all()
     return [_serialize_pitch(sap, ps, tl) for sap, ps, tl in rows]
+
+
+@router.get(
+    "/team-leads",
+    response_model=list[TeamLeadBrief],
+    responses={
+        401: {"description": "Missing or invalid token"},
+        403: {"description": "Not a SPOC"},
+    },
+)
+async def list_team_leads(
+    spoc: SpocUniversity = Depends(get_current_spoc),
+    db: AsyncSession = Depends(get_db),
+) -> list[TeamLeadBrief]:
+    uni = (
+        await db.execute(select(University).where(University.id == spoc.uni_id))
+    ).scalar_one_or_none()
+    if uni is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="SPOC's university record missing.",
+        )
+    result = await db.execute(
+        select(TeamLead)
+        .where(TeamLead.uni_id == uni.registration_number)
+        .order_by(TeamLead.name)
+    )
+    return [TeamLeadBrief.model_validate(row) for row in result.scalars().all()]
 
 
 def _serialize_pitch(
