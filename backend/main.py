@@ -1,11 +1,45 @@
+# # from contextlib import asynccontextmanager
+# # from fastapi import FastAPI
+# # from routes import auth
+# # from database import Base, engine
+
+# # from models.ai_test import AIProblemTest
+# # from routes.ai_test import router as ai_test_router
+# # from routes.problems import router as problems_router  # ← ADD
+
+
+# # @asynccontextmanager
+# # async def lifespan(app: FastAPI):
+# #     async with engine.begin() as conn:
+# #         await conn.run_sync(Base.metadata.create_all)
+# #     yield
+
+
+# # app = FastAPI(title="e-KALP", lifespan=lifespan)
+# # app.include_router(auth.router)
+# # app.include_router(ai_test_router)
+# # app.include_router(problems_router)
+
+
+# # @app.get("/")
+# # def health_check():
+# #     return {"status": "healthy"}
+
+
 # from contextlib import asynccontextmanager
 # from fastapi import FastAPI
+# from fastapi.middleware.cors import CORSMiddleware
+
 # from routes import auth
 # from database import Base, engine
 
-# from models.ai_test import AIProblemTest
-# from routes.ai_test import router as ai_test_router
-# from routes.problems import router as problems_router  # ← ADD
+# # from models.ai_test import AIProblemTest
+
+# # from routes.ai_test import router as ai_test_router
+# from routes.problems import router as problems_router
+# from routes.profile import router as profile_router
+# from routes.peasant import router as citizen_router
+# from routes.univ import router as uni_router
 
 
 # @asynccontextmanager
@@ -16,42 +50,46 @@
 
 
 # app = FastAPI(title="e-KALP", lifespan=lifespan)
+
+
+# # CORS configuration
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=[
+#         "http://localhost:5173",
+#         "http://127.0.0.1:5173",
+#     ],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+
 # app.include_router(auth.router)
-# app.include_router(ai_test_router)
+# # app.include_router(ai_test_router)
 # app.include_router(problems_router)
+# app.include_router(profile_router)
+# app.include_router(citizen_router)
+# app.include_router(uni_router)
 
 
 # @app.get("/")
 # def health_check():
-#     return {"status": "healthy"}
+#     return {"status": "WELCOME TO EKALP_BACKEND SERVICE"}
 
-
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routes import auth
-from database import Base, engine
-from models.ai_test import AIProblemTest
-from routes.ai_test import router as ai_test_router
 from routes.problems import router as problems_router
 from routes.profile import router as profile_router
 from routes.peasant import router as citizen_router
 from routes.univ import router as uni_router
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
+app = FastAPI(title="e-KALP")
 
 
-app = FastAPI(title="e-KALP", lifespan=lifespan)
-
-
-# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -65,7 +103,6 @@ app.add_middleware(
 
 
 app.include_router(auth.router)
-app.include_router(ai_test_router)
 app.include_router(problems_router)
 app.include_router(profile_router)
 app.include_router(citizen_router)
