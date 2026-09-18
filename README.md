@@ -1,3 +1,5 @@
+![Project Screenshot](images/logo.png)
+
 # e-KALP 🦢️✨️
 ### Turning Real-World Problems into Meaningful Change
 
